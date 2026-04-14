@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert employee record
-    const { data: newEmployee, error: insertError } = await supabase
+    // Insert employee record using service role (bypasses RLS)
+    const { data: newEmployee, error: insertError } = await serviceSupabase
       .from("employees")
       .insert({
         id: authData.user.id,
