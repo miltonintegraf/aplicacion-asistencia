@@ -258,12 +258,22 @@ export function AttendanceButtons({
   const initSignatureCanvas = () => {
     const canvas = sigCanvasRef.current;
     if (!canvas) return;
+
+    // Set canvas to fill its container properly
+    const container = canvas.parentElement;
+    if (container) {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#000000";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
 
   useEffect(() => {
@@ -857,8 +867,6 @@ export function AttendanceButtons({
             {!capturedSignature ? (
               <canvas
                 ref={sigCanvasRef}
-                width={400}
-                height={300}
                 onMouseDown={handleSignatureStart}
                 onMouseMove={handleSignatureMove}
                 onMouseUp={handleSignatureEnd}
@@ -867,6 +875,7 @@ export function AttendanceButtons({
                 onTouchMove={handleSignatureMove}
                 onTouchEnd={handleSignatureEnd}
                 className="absolute inset-0 w-full h-full touch-none cursor-crosshair bg-white"
+                style={{ display: "block" }}
               />
             ) : (
               <img
