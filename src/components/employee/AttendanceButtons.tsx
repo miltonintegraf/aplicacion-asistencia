@@ -18,6 +18,7 @@ interface AttendanceButtonsProps {
   fotoRequerida: boolean;
   modalidad: "presencial" | "remoto" | "hibrido";
   diasPresenciales: number[];
+  duracionColacionDefault?: 30 | 45 | 60;
 }
 
 // Helper: normalize legacy types to new types
@@ -105,6 +106,7 @@ export function AttendanceButtons({
   fotoRequerida,
   modalidad,
   diasPresenciales,
+  duracionColacionDefault = 45,
 }: AttendanceButtonsProps) {
   const router = useRouter();
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -120,7 +122,7 @@ export function AttendanceButtons({
   >("idle");
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [lunchDuration, setLunchDuration] = useState<30 | 45 | 60 | null>(null);
+  const [lunchDuration] = useState<30 | 45 | 60>(duracionColacionDefault);
 
   // Camera states
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -280,10 +282,6 @@ export function AttendanceButtons({
           type: "success",
           text: `${json.message}${json.distancia ? ` (${json.distancia}m de la empresa)` : ""}`,
         });
-        // Reset lunch duration after successful salida_almuerzo
-        if (tipo === "salida_almuerzo") {
-          setLunchDuration(null);
-        }
         await fetchTodayRecords();
       } else {
         setMessage({
@@ -327,15 +325,6 @@ export function AttendanceButtons({
   const requiresGps = isPresencialDay();
 
   const marcarAsistencia = async (tipo: TipoRegistro) => {
-    // Validate lunch duration for salida_almuerzo
-    if (tipo === "salida_almuerzo" && !lunchDuration) {
-      setMessage({
-        type: "error",
-        text: "Debes seleccionar duración de colación",
-      });
-      return;
-    }
-
     setMessage(null);
     setLoading(tipo);
 
@@ -455,35 +444,22 @@ export function AttendanceButtons({
   return (
     <>
       <div className="space-y-6">
-        {/* Cronómetro or Wall Clock */}
+        {/* Cronómetro */}
         <div className="text-center">
-          {dayStep === "no_records" ? (
-            <>
-              <div className="text-5xl font-bold text-gray-900 font-mono tracking-tight">
-                {currentTime
-                  ? currentTime.toLocaleTimeString("es-AR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })
-                  : "--:--:--"}
-              </div>
-              <div className="text-gray-500 mt-2 text-sm">Hora actual</div>
-            </>
-          ) : (
-            <>
-              <div
-                className={`text-5xl font-bold font-mono tracking-tight ${
-                  dayStep === "salida_almuerzo" ? "text-amber-600" : "text-green-600"
-                }`}
-              >
-                {formatElapsed(elapsedMs)}
-              </div>
-              <div className="text-gray-500 mt-2 text-sm">
-                {dayStep === "salida_almuerzo" ? "⏸ En pausa de almuerzo" : "Tiempo trabajado"}
-              </div>
-            </>
-          )}
+          <div
+            className={`text-5xl font-bold font-mono tracking-tight ${
+              dayStep === "salida_almuerzo" ? "text-amber-600" : "text-green-600"
+            }`}
+          >
+            {formatElapsed(elapsedMs)}
+          </div>
+          <div className="text-gray-500 mt-2 text-sm">
+            {dayStep === "no_records"
+              ? "Cronómetro listo"
+              : dayStep === "salida_almuerzo"
+              ? "⏸ En pausa de almuerzo"
+              : "Tiempo trabajado"}
+          </div>
           <div className="text-gray-500 mt-2 capitalize text-xs">
             {currentTime
               ? currentTime.toLocaleDateString("es-AR", {
@@ -554,27 +530,6 @@ export function AttendanceButtons({
           </span>
         </div>
 
-        {/* Lunch duration selector - shown when about to mark salida_almuerzo */}
-        {dayStep === "entrada_laboral" && (
-          <div className="bg-blue-50 rounded-xl p-4 space-y-3 border border-blue-100">
-            <p className="text-sm font-medium text-blue-900">Elige duración de colación:</p>
-            <div className="flex gap-2">
-              {[30, 45, 60].map((dur) => (
-                <button
-                  key={dur}
-                  onClick={() => setLunchDuration(dur as 30 | 45 | 60)}
-                  className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-all ${
-                    lunchDuration === dur
-                      ? "bg-blue-500 text-white"
-                      : "bg-white text-blue-600 border border-blue-200 hover:bg-blue-100"
-                  }`}
-                >
-                  {dur} min
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Feedback message */}
         {message && (
@@ -625,11 +580,7 @@ export function AttendanceButtons({
               marcarAsistencia(nextStep as TipoRegistro);
             }
           }}
-          disabled={
-            loading !== null ||
-            dayStep === "completed" ||
-            (dayStep === "entrada_laboral" && !lunchDuration)
-          }
+          disabled={loading !== null || dayStep === "completed"}
           className={`
             relative flex flex-col items-center justify-center
             h-44 rounded-2xl font-bold text-white text-xl
@@ -657,7 +608,7 @@ export function AttendanceButtons({
             </svg>
           ) : (
             <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m0 0h-6m0-6h-6m0 6h6" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12M6 12h12" />
             </svg>
           )}
           {loading
@@ -665,9 +616,7 @@ export function AttendanceButtons({
             : dayStep === "no_records"
               ? "MARCAR ENTRADA"
               : dayStep === "entrada_laboral"
-                ? lunchDuration
-                  ? `MARCAR SALIDA ALMUERZO (${lunchDuration} min)`
-                  : "Elige duración de colación"
+                ? `MARCAR SALIDA ALMUERZO (${lunchDuration} min)`
                 : dayStep === "salida_almuerzo"
                   ? "MARCAR REGRESO ALMUERZO"
                   : dayStep === "entrada_almuerzo"
