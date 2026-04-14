@@ -7,6 +7,9 @@ export interface Company {
   radio_permitido_metros: number;
   foto_requerida: boolean;
   firma_requerida: boolean;
+  hora_entrada: string | null;
+  hora_salida: string | null;
+  tolerancia_minutos: number;
   estado_suscripcion: "trial" | "active" | "expired" | "cancelled";
   fecha_inicio_trial: string;
   dias_trial: number;
@@ -119,4 +122,7 @@ export interface UpdateCompanyPayload {
   radio_permitido_metros?: number;
   foto_requerida?: boolean;
   firma_requerida?: boolean;
+  hora_entrada?: string;
+  hora_salida?: string;
+  tolerancia_minutos?: number;
 }

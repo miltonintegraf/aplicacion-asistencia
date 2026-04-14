@@ -91,6 +91,12 @@ export async function PATCH(request: NextRequest) {
       updateData.foto_requerida = body.foto_requerida;
     if (body.firma_requerida !== undefined)
       updateData.firma_requerida = body.firma_requerida;
+    if (body.hora_entrada !== undefined)
+      updateData.hora_entrada = body.hora_entrada;
+    if (body.hora_salida !== undefined)
+      updateData.hora_salida = body.hora_salida;
+    if (body.tolerancia_minutos !== undefined)
+      updateData.tolerancia_minutos = body.tolerancia_minutos;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

@@ -19,6 +19,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
     radio_permitido_metros: "",
     foto_requerida: false,
     firma_requerida: false,
+    hora_entrada: "09:00",
+    hora_salida: "18:00",
+    tolerancia_minutos: "15",
   });
 
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         radio_permitido_metros: String(initialCompany.radio_permitido_metros || ""),
         foto_requerida: initialCompany.foto_requerida || false,
         firma_requerida: initialCompany.firma_requerida || false,
+        hora_entrada: initialCompany.hora_entrada || "09:00",
+        hora_salida: initialCompany.hora_salida || "18:00",
+        tolerancia_minutos: String(initialCompany.tolerancia_minutos || "15"),
       });
       setLoading(false);
     }
@@ -59,6 +65,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
           radio_permitido_metros: parseInt(form.radio_permitido_metros),
           foto_requerida: form.foto_requerida,
           firma_requerida: form.firma_requerida,
+          hora_entrada: form.hora_entrada,
+          hora_salida: form.hora_salida,
+          tolerancia_minutos: parseInt(form.tolerancia_minutos),
         }),
       });
 
@@ -352,6 +361,53 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Horario laboral */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">
+            Horario laboral
+          </h2>
+          <p className="text-sm text-gray-500">
+            Define el horario de tu empresa para calcular tardanzas y alertas automáticas
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Hora de entrada"
+              type="time"
+              value={form.hora_entrada}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, hora_entrada: e.target.value }))
+              }
+            />
+            <Input
+              label="Hora de salida"
+              type="time"
+              value={form.hora_salida}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, hora_salida: e.target.value }))
+              }
+            />
+          </div>
+
+          <Input
+            label="Minutos de tolerancia"
+            type="number"
+            min="0"
+            max="60"
+            value={form.tolerancia_minutos}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, tolerancia_minutos: e.target.value }))
+            }
+            helperText="Ej: 15 min = quien entra antes de las 9:15 no se considera tarde"
+          />
+
+          {company?.hora_entrada && company?.hora_salida && (
+            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700">
+              <strong>Configuración actual:</strong> Entrada {company.hora_entrada}, Salida {company.hora_salida} ({company.tolerancia_minutos} min tolerancia)
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end">

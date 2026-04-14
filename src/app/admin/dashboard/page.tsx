@@ -1,5 +1,6 @@
 import { getUser, getEmployee, createClient } from "@/lib/supabase/server";
 import { StatsCard } from "@/components/admin/StatsCard";
+import { AdminDashboardAlerts } from "@/components/admin/AdminDashboardClient";
 import { redirect } from "next/navigation";
 
 export default async function AdminDashboardPage() {
@@ -19,23 +20,23 @@ export default async function AdminDashboardPage() {
 
   const supabase = await createClient();
 
-  // Run all 4 independent queries in parallel
+  // Run all queries in parallel
   const [
-    { count: totalEmpleados },
+    { count: totalEmpleados, data: allEmpleados },
     { data: entradas },
     { data: registrosHoy },
     { data: company },
   ] = await Promise.all([
     supabase
       .from("employees")
-      .select("*", { count: "exact", head: true })
+      .select("id, nombre, email", { count: "exact" })
       .eq("empresa_id", empresa_id)
       .eq("activo", true)
       .neq("role", "admin"),
 
     supabase
       .from("attendance")
-      .select("empleado_id")
+      .select("empleado_id, tipo_registro, fecha_hora")
       .eq("empresa_id", empresa_id)
       .in("tipo_registro", ["entrada", "entrada_laboral"])
       .gte("fecha_hora", todayStart)
@@ -60,13 +61,138 @@ export default async function AdminDashboardPage() {
 
     supabase
       .from("companies")
-      .select("nombre_empresa")
+      .select("nombre_empresa, hora_entrada, hora_salida, tolerancia_minutos")
       .eq("id", empresa_id)
       .single(),
   ]);
 
   const presentesHoy = new Set(entradas?.map((e) => e.empleado_id)).size;
   const ausentesHoy = Math.max(0, (totalEmpleados ?? 0) - presentesHoy);
+
+  // Calculate alerts
+  interface AlertaTardanza {
+    id: string;
+    nombre: string;
+    minutosLate: number;
+    horaEntrada: string;
+  }
+  interface AlertaAusente {
+    id: string;
+    nombre: string;
+  }
+  interface AlertaSinSalida {
+    id: string;
+    nombre: string;
+    horaEntrada: string;
+  }
+
+  const tardanzas: AlertaTardanza[] = [];
+  const ausentes: AlertaAusente[] = [];
+  const sinSalida: AlertaSinSalida[] = [];
+
+  if (company && allEmpleados && entradas) {
+    const horaEntradaStr = company.hora_entrada || "09:00";
+    const horaSalidaStr = company.hora_salida || "18:00";
+    const toleranciaMinutos = company.tolerancia_minutos || 15;
+
+    // Parse company times
+    const [entradaHour, entradaMin] = horaEntradaStr.split(":").map(Number);
+    const [salidaHour, salidaMin] = horaSalidaStr.split(":").map(Number);
+
+    const horaEntradaEsperada = new Date();
+    horaEntradaEsperada.setHours(entradaHour, entradaMin, 0, 0);
+
+    const horaSalidaEsperada = new Date();
+    horaSalidaEsperada.setHours(salidaHour, salidaMin, 0, 0);
+
+    const ahora = new Date();
+    const horaSinSalidaAlerta = new Date(horaSalidaEsperada.getTime() + 40 * 60 * 1000);
+
+    // Track employee entries and exits
+    const empleadoEntrada = new Map<string, { fecha_hora: string; tipo_registro: string }>();
+    const empleadoSalida = new Map<string, string>();
+
+    for (const reg of entradas) {
+      if (["entrada", "entrada_laboral"].includes(reg.tipo_registro)) {
+        empleadoEntrada.set(reg.empleado_id, { fecha_hora: reg.fecha_hora, tipo_registro: reg.tipo_registro });
+      }
+    }
+
+    for (const reg of registrosHoy ?? []) {
+      if (["salida", "salida_laboral"].includes(reg.tipo_registro)) {
+        empleadoSalida.set(reg.id, reg.id); // Just mark as present
+      }
+    }
+
+    // Check each employee
+    for (const emp of allEmpleados) {
+      const tieneEntrada = empleadoEntrada.has(emp.id);
+
+      if (!tieneEntrada) {
+        // Ausente
+        ausentes.push({ id: emp.id, nombre: emp.nombre });
+      } else {
+        // Has entrada, check for tardanza
+        const entradaReg = empleadoEntrada.get(emp.id)!;
+        const horaEntradaReal = new Date(entradaReg.fecha_hora);
+        const horaEntradaFormato = horaEntradaReal.toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const horaEsperada = new Date();
+        horaEsperada.setHours(entradaHour, entradaMin, 0, 0);
+
+        const minutosLate = Math.floor(
+          (horaEntradaReal.getTime() - horaEsperada.getTime()) / (1000 * 60)
+        );
+
+        if (minutosLate > toleranciaMinutos) {
+          tardanzas.push({
+            id: emp.id,
+            nombre: emp.nombre,
+            minutosLate,
+            horaEntrada: horaEntradaFormato,
+          });
+        }
+
+        // Check sin salida (if after 40 min from expected exit and no salida)
+        if (ahora > horaSinSalidaAlerta) {
+          const tieneSalida = registrosHoy?.some(
+            (r) =>
+              r.id &&
+              (registrosHoy || []).some(
+                (reg) =>
+                  reg.tipo_registro && ["salida", "salida_laboral"].includes(reg.tipo_registro)
+              )
+          );
+
+          // Simpler check: look for any salida_laboral or salida for this employee today
+          const empleadoEnRegistros = (registrosHoy || []).find((r) => {
+            const emp_name = (r.employees as any)?.nombre === allEmpleados.find((e) => e.id === emp.id)?.nombre;
+            return emp_name;
+          });
+
+          let hasSalida = false;
+          if (empleadoEnRegistros) {
+            hasSalida = (registrosHoy || []).some(
+              (r) =>
+                (r.employees as any)?.nombre === emp.nombre &&
+                ["salida", "salida_laboral"].includes(r.tipo_registro)
+            );
+          }
+
+          if (!hasSalida) {
+            sinSalida.push({
+              id: emp.id,
+              nombre: emp.nombre,
+              horaEntrada: horaEntradaFormato,
+            });
+          }
+        }
+      }
+    }
+  }
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("es-AR", {
@@ -90,6 +216,13 @@ export default async function AdminDashboardPage() {
           </p>
         )}
       </div>
+
+      {/* Alerts */}
+      <AdminDashboardAlerts
+        tardanzas={tardanzas}
+        ausentes={ausentes}
+        sinSalida={sinSalida}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
