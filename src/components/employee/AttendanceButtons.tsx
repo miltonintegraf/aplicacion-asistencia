@@ -16,6 +16,7 @@ interface TodayRecord {
 interface AttendanceButtonsProps {
   empleadoId: string;
   fotoRequerida: boolean;
+  firmaRequerida: boolean;
   modalidad: "presencial" | "remoto" | "hibrido";
   diasPresenciales: number[];
   duracionColacionDefault?: 30 | 45 | 60;
@@ -104,6 +105,7 @@ function formatElapsed(ms: number): string {
 export function AttendanceButtons({
   empleadoId,
   fotoRequerida,
+  firmaRequerida,
   modalidad,
   diasPresenciales,
   duracionColacionDefault = 45,
@@ -130,8 +132,15 @@ export function AttendanceButtons({
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [pendingTipo, setPendingTipo] = useState<TipoRegistro | null>(null);
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pendingFotoBase64, setPendingFotoBase64] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Signature states
+  const [signatureOpen, setSignatureOpen] = useState(false);
+  const [capturedSignature, setCapturedSignature] = useState<string | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const sigCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Derive day step from records
   const dayStep = deriveDayStep(todayRecords);
@@ -245,10 +254,108 @@ export function AttendanceButtons({
     setGpsStatus("idle");
   };
 
+  // Signature canvas helpers
+  const initSignatureCanvas = () => {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#000000";
+  };
+
+  useEffect(() => {
+    if (signatureOpen && !capturedSignature) {
+      initSignatureCanvas();
+    }
+  }, [signatureOpen, capturedSignature]);
+
+  const getSignatureCanvasCoords = (e: React.MouseEvent | React.TouchEvent): { x: number; y: number } => {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    }
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const handleSignatureStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDrawing(true);
+    const canvas = sigCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) return;
+    const { x, y } = getSignatureCanvasCoords(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const handleSignatureMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = sigCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) return;
+    const { x, y } = getSignatureCanvasCoords(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const handleSignatureEnd = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDrawing(false);
+  };
+
+  const clearSignature = () => {
+    const canvas = sigCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setCapturedSignature(null);
+  };
+
+  const confirmSignature = () => {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL("image/png");
+    setCapturedSignature(dataUrl);
+  };
+
+  const cancelSignature = () => {
+    setSignatureOpen(false);
+    setCapturedSignature(null);
+    setPendingCoords(null);
+    setPendingTipo(null);
+    setPendingFotoBase64(null);
+    setLoading(null);
+    setGpsStatus("idle");
+  };
+
+  const submitWithSignature = async () => {
+    if (!pendingCoords || !pendingTipo) return;
+
+    setLoading(pendingTipo);
+    setSignatureOpen(false);
+
+    const firma_base64 = capturedSignature?.split(",")[1];
+    await submitAttendance(pendingTipo, pendingCoords, pendingFotoBase64 || undefined, firma_base64);
+  };
+
   const submitAttendance = async (
     tipo: TipoRegistro,
     coords: { lat: number; lng: number },
-    foto_base64?: string
+    foto_base64?: string,
+    firma_base64?: string
   ) => {
     try {
       const payload: any = {
@@ -257,6 +364,7 @@ export function AttendanceButtons({
         latitud: coords.lat,
         longitud: coords.lng,
         ...(foto_base64 ? { foto_base64 } : {}),
+        ...(firma_base64 ? { firma_base64 } : {}),
       };
 
       // Add lunch duration for salida_almuerzo
@@ -305,10 +413,18 @@ export function AttendanceButtons({
   const confirmAndSubmit = async () => {
     if (!pendingCoords || !pendingTipo || !capturedPhoto) return;
 
+    const foto_base64 = capturedPhoto.split(",")[1];
+
+    // If signature is required, open signature canvas instead of submitting
+    if (firmaRequerida) {
+      setCameraOpen(false);
+      setPendingFotoBase64(foto_base64);
+      setSignatureOpen(true);
+      return;
+    }
+
     setLoading(pendingTipo);
     setCameraOpen(false);
-
-    const foto_base64 = capturedPhoto.split(",")[1];
     await submitAttendance(pendingTipo, pendingCoords, foto_base64);
   };
 
@@ -353,17 +469,28 @@ export function AttendanceButtons({
           lng: position.coords.longitude,
         };
 
-        if (!fotoRequerida) {
+        if (!fotoRequerida && !firmaRequerida) {
           setPendingCoords(coords);
           setPendingTipo(tipo);
           submitAttendance(tipo, coords);
           return;
         }
 
-        setLoading(null);
-        setPendingCoords(coords);
-        setPendingTipo(tipo);
-        setCameraOpen(true);
+        if (fotoRequerida) {
+          setLoading(null);
+          setPendingCoords(coords);
+          setPendingTipo(tipo);
+          setCameraOpen(true);
+          return;
+        }
+
+        if (firmaRequerida && !fotoRequerida) {
+          setLoading(null);
+          setPendingCoords(coords);
+          setPendingTipo(tipo);
+          setSignatureOpen(true);
+          return;
+        }
       },
       (geoError) => {
         setGpsStatus("denied");
@@ -699,6 +826,91 @@ export function AttendanceButtons({
 
           {/* Hidden canvas for capture */}
           <canvas ref={canvasRef} className="hidden" />
+        </div>
+      )}
+
+      {/* Signature Modal */}
+      {signatureOpen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-4 bg-black/80">
+            <div>
+              <p className="text-white font-semibold text-base">
+                {capturedSignature ? "Confirmar firma" : "Firma con el dedo"}
+              </p>
+              <p className="text-white/50 text-xs mt-0.5">
+                {capturedSignature ? "¿Se ve bien? Confirmá para registrar" : `Para confirmar tu ${pendingTipo}`}
+              </p>
+            </div>
+            <button
+              onClick={cancelSignature}
+              className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Canvas area */}
+          <div className="flex-1 relative overflow-hidden bg-white">
+            {!capturedSignature ? (
+              <canvas
+                ref={sigCanvasRef}
+                width={400}
+                height={300}
+                onMouseDown={handleSignatureStart}
+                onMouseMove={handleSignatureMove}
+                onMouseUp={handleSignatureEnd}
+                onMouseLeave={handleSignatureEnd}
+                onTouchStart={handleSignatureStart}
+                onTouchMove={handleSignatureMove}
+                onTouchEnd={handleSignatureEnd}
+                className="absolute inset-0 w-full h-full touch-none cursor-crosshair bg-white"
+              />
+            ) : (
+              <img
+                src={capturedSignature}
+                alt="Firma"
+                className="absolute inset-0 w-full h-full object-contain"
+              />
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="bg-black px-6 py-8">
+            {!capturedSignature ? (
+              <div className="flex gap-4">
+                <button
+                  onClick={clearSignature}
+                  className="flex-1 py-3.5 rounded-2xl border border-white/30 text-white font-semibold text-base hover:bg-white/10 transition-colors"
+                >
+                  Limpiar
+                </button>
+                <button
+                  onClick={confirmSignature}
+                  className="flex-1 py-3.5 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-base transition-colors"
+                >
+                  Confirmar
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-4">
+                <button
+                  onClick={clearSignature}
+                  className="flex-1 py-3.5 rounded-2xl border border-white/30 text-white font-semibold text-base hover:bg-white/10 transition-colors"
+                >
+                  Repetir
+                </button>
+                <button
+                  onClick={submitWithSignature}
+                  className="flex-1 py-3.5 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-base transition-colors"
+                >
+                  Registrar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </>

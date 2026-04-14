@@ -18,6 +18,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
     longitud: "",
     radio_permitido_metros: "",
     foto_requerida: false,
+    firma_requerida: false,
   });
 
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         longitud: String(initialCompany.longitud || ""),
         radio_permitido_metros: String(initialCompany.radio_permitido_metros || ""),
         foto_requerida: initialCompany.foto_requerida || false,
+        firma_requerida: initialCompany.firma_requerida || false,
       });
       setLoading(false);
     }
@@ -56,6 +58,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
           longitud: parseFloat(form.longitud),
           radio_permitido_metros: parseInt(form.radio_permitido_metros),
           foto_requerida: form.foto_requerida,
+          firma_requerida: form.firma_requerida,
         }),
       });
 
@@ -288,9 +291,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
           )}
         </div>
 
-        {/* Foto requerida */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100 mb-4">
+        {/* Foto y firma requerida */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">
             Registro de asistencia
           </h2>
           <div className="flex items-start justify-between gap-4">
@@ -319,6 +322,35 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
                 }`}
               />
             </button>
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  Requerir firma al marcar asistencia
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Los empleados deberán firmar con el dedo en cada registro
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({ ...p, firma_requerida: !p.firma_requerida }))
+                }
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                  form.firma_requerida ? "bg-blue-600" : "bg-gray-200"
+                }`}
+                role="switch"
+                aria-checked={form.firma_requerida}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                    form.firma_requerida ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
 

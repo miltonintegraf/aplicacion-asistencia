@@ -307,6 +307,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Upload signature to private storage if provided
+    let firma_url: string | null = null;
+    if (body.firma_base64) {
+      try {
+        const serviceClient = await createServiceClient();
+        const buffer = Buffer.from(body.firma_base64, "base64");
+        const fileName = `${empleado_id}/${Date.now()}_firma.png`;
+        const { error: uploadError } = await serviceClient.storage
+          .from("attendance-signatures")
+          .upload(fileName, buffer, {
+            contentType: "image/png",
+            upsert: false,
+          });
+        if (!uploadError) {
+          firma_url = fileName;
+        }
+      } catch {
+        // Signature upload failed — continue without it
+      }
+    }
+
     // Build insert payload
     const insertPayload: any = {
       empresa_id: currentEmployee.empresa_id,
@@ -317,6 +338,7 @@ export async function POST(request: NextRequest) {
       distancia_empresa_metros: distancia !== null ? Math.round(distancia) : null,
       valido,
       foto_url,
+      firma_url,
     };
 
     // Add duracion_colacion_minutos only for salida_almuerzo

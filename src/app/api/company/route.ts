@@ -89,6 +89,8 @@ export async function PATCH(request: NextRequest) {
       updateData.radio_permitido_metros = body.radio_permitido_metros;
     if (body.foto_requerida !== undefined)
       updateData.foto_requerida = body.foto_requerida;
+    if (body.firma_requerida !== undefined)
+      updateData.firma_requerida = body.firma_requerida;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

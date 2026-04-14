@@ -6,6 +6,7 @@ export interface Company {
   longitud: number | null;
   radio_permitido_metros: number;
   foto_requerida: boolean;
+  firma_requerida: boolean;
   estado_suscripcion: "trial" | "active" | "expired" | "cancelled";
   fecha_inicio_trial: string;
   dias_trial: number;
@@ -44,6 +45,7 @@ export interface AttendanceRecord {
   distancia_empresa_metros: number | null;
   valido: boolean;
   foto_url: string | null;
+  firma_url: string | null;
   duracion_colacion_minutos?: number | null;
   // joined fields
   employees?: {
@@ -105,6 +107,7 @@ export interface CreateAttendancePayload {
   latitud: number;
   longitud: number;
   foto_base64?: string;
+  firma_base64?: string;
   duracion_colacion_minutos?: number;
 }
 
@@ -115,4 +118,5 @@ export interface UpdateCompanyPayload {
   longitud?: number;
   radio_permitido_metros?: number;
   foto_requerida?: boolean;
+  firma_requerida?: boolean;
 }

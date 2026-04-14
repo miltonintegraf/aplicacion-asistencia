@@ -61,7 +61,7 @@ export default async function EmployeeDashboardPage() {
 
   const { data: company } = await supabase
     .from("companies")
-    .select("nombre_empresa, foto_requerida")
+    .select("nombre_empresa, foto_requerida, firma_requerida")
     .eq("id", employee.empresa_id)
     .single();
 
@@ -117,6 +117,7 @@ export default async function EmployeeDashboardPage() {
           <AttendanceButtons
             empleadoId={user.id}
             fotoRequerida={company?.foto_requerida ?? false}
+            firmaRequerida={company?.firma_requerida ?? false}
             modalidad={employee?.modalidad ?? "presencial"}
             diasPresenciales={employee?.dias_presenciales ?? []}
           />
