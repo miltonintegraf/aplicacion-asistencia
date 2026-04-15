@@ -10,6 +10,8 @@ interface EmployeeSummary {
   dias_trabajados: number;
   total_entradas: number;
   total_salidas: number;
+  horas_trabajadas: number;
+  horas_estimadas: number;
 }
 
 interface Employee {
@@ -30,7 +32,6 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
   const [summary, setSummary] = useState<EmployeeSummary[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fechaInicio = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -44,67 +45,13 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
       const params = new URLSearchParams({
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
-        limit: "500",
       });
+      const res = await fetch(`/api/attendance/summary?${params}`);
+      const json = await res.json();
 
-      const [attendanceRes, empRes] = await Promise.all([
-        fetch(`/api/attendance?${params}`),
-        fetch("/api/employees"),
-      ]);
+      if (!res.ok) throw new Error(json.error ?? "Error al obtener datos");
 
-      const attendanceJson = await attendanceRes.json();
-      const empJson = await empRes.json();
-
-      if (!attendanceRes.ok)
-        throw new Error(attendanceJson.error ?? "Error al obtener datos");
-
-      const records: {
-        empleado_id: string;
-        tipo_registro: string;
-        fecha_hora: string;
-      }[] = attendanceJson.data ?? [];
-      const allEmployees: Employee[] = empJson.data ?? [];
-      setEmpleados(allEmployees);
-
-      // Build summary
-      const summaryMap: Record<
-        string,
-        { entradas: number; salidas: number; dias: Set<string> }
-      > = {};
-
-      for (const r of records) {
-        if (!summaryMap[r.empleado_id]) {
-          summaryMap[r.empleado_id] = {
-            entradas: 0,
-            salidas: 0,
-            dias: new Set(),
-          };
-        }
-        // Count entrada or entrada_laboral as workday starts
-        if (r.tipo_registro === "entrada" || r.tipo_registro === "entrada_laboral") {
-          summaryMap[r.empleado_id].entradas++;
-          summaryMap[r.empleado_id].dias.add(
-            r.fecha_hora.split("T")[0]
-          );
-        }
-        // Count salida or salida_laboral as workday ends
-        if (r.tipo_registro === "salida" || r.tipo_registro === "salida_laboral") {
-          summaryMap[r.empleado_id].salidas++;
-        }
-      }
-
-      const result: EmployeeSummary[] = allEmployees
-        .filter((e) => summaryMap[e.id])
-        .map((emp) => ({
-          id: emp.id,
-          nombre: emp.nombre,
-          email: emp.email,
-          dias_trabajados: summaryMap[emp.id]?.dias.size ?? 0,
-          total_entradas: summaryMap[emp.id]?.entradas ?? 0,
-          total_salidas: summaryMap[emp.id]?.salidas ?? 0,
-        }));
-
-      setSummary(result);
+      setSummary(json.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
@@ -143,43 +90,6 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
     } finally {
       setExporting(false);
     }
-  };
-
-  const handleExportCsv = () => {
-    if (summary.length === 0) return;
-    setExportingCsv(true);
-
-    const headers = [
-      "Empleado",
-      "Email",
-      "Días trabajados",
-      "Total entradas",
-      "Total salidas",
-    ];
-    const rows = summary.map((s) => [
-      s.nombre,
-      s.email,
-      s.dias_trabajados,
-      s.total_entradas,
-      s.total_salidas,
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `resumen_asistencias_${year}_${String(month).padStart(2, "0")}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setExportingCsv(false);
   };
 
   const monthNames = [
@@ -236,48 +146,27 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
             </div>
           </div>
 
-          <div className="flex gap-2 sm:ml-auto">
-            <Button
-              variant="secondary"
-              onClick={handleExportCsv}
-              loading={exportingCsv}
-              disabled={summary.length === 0}
+          <Button
+            onClick={handleExportExcel}
+            loading={exporting}
+            disabled={summary.length === 0}
+            className="sm:ml-auto"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Exportar CSV
-            </Button>
-            <Button
-              onClick={handleExportExcel}
-              loading={exporting}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Exportar Excel
-            </Button>
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            Exportar Excel
+          </Button>
         </div>
       </div>
 
@@ -331,44 +220,55 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                     Empleado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Email
-                  </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
                     Días trabajados
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
-                    Entradas
+                    Horas estimadas
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
-                    Salidas
+                    Horas trabajadas
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
+                    Diferencia
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {summary.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {emp.nombre}
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 text-sm">{emp.email}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
-                        {emp.dias_trabajados}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-full font-semibold text-sm">
-                        {emp.total_entradas}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 bg-red-100 text-red-700 rounded-full font-semibold text-sm">
-                        {emp.total_salidas}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {summary.map((emp) => {
+                  const diferencia = emp.horas_trabajadas - emp.horas_estimadas;
+                  const diferenciaBadgeColor =
+                    diferencia > 0
+                      ? "bg-green-100 text-green-700"
+                      : diferencia < 0
+                      ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-700";
+
+                  return (
+                    <tr key={emp.id} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-4 font-medium text-gray-900">
+                        {emp.nombre}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
+                          {emp.dias_trabajados}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center font-mono text-sm text-gray-700">
+                        {emp.horas_estimadas.toFixed(1)}h
+                      </td>
+                      <td className="px-6 py-4 text-center font-mono text-sm text-gray-700">
+                        {emp.horas_trabajadas.toFixed(1)}h
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center justify-center px-2 py-1 rounded font-mono text-sm font-semibold ${diferenciaBadgeColor}`}>
+                          {diferencia > 0 ? "+" : ""}
+                          {diferencia.toFixed(1)}h
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
