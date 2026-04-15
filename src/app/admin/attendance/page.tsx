@@ -6,6 +6,7 @@ interface SearchParams {
   empleado_id?: string;
   fecha_inicio?: string;
   fecha_fin?: string;
+  tipo_registro?: string;
   page?: string;
 }
 
@@ -68,6 +69,9 @@ export default async function AttendancePage({
       params.fecha_fin + "T23:59:59.999Z"
     );
   }
+  if (params.tipo_registro) {
+    query = query.eq("tipo_registro", params.tipo_registro);
+  }
 
   const { data: records, count } = await query.range(
     offset,
@@ -97,6 +101,7 @@ export default async function AttendancePage({
       empleado_id: params.empleado_id ?? "",
       fecha_inicio: params.fecha_inicio ?? "",
       fecha_fin: params.fecha_fin ?? "",
+      tipo_registro: params.tipo_registro ?? "",
       page: "1",
       ...params,
     };
@@ -119,17 +124,17 @@ export default async function AttendancePage({
       <form
         method="GET"
         action="/admin/attendance"
-        className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6"
+        className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
               Empleado
             </label>
             <select
               name="empleado_id"
               defaultValue={params.empleado_id ?? ""}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
             >
               <option value="">Todos</option>
               {empleados?.map((emp) => (
@@ -141,39 +146,58 @@ export default async function AttendancePage({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
               Desde
             </label>
             <input
               type="date"
               name="fecha_inicio"
               defaultValue={params.fecha_inicio ?? ""}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
               Hasta
             </label>
             <input
               type="date"
               name="fecha_fin"
               defaultValue={params.fecha_fin ?? ""}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
+              Tipo
+            </label>
+            <select
+              name="tipo_registro"
+              defaultValue={params.tipo_registro ?? ""}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+            >
+              <option value="">Todos</option>
+              <option value="entrada_laboral">Entrada Laboral</option>
+              <option value="salida_almuerzo">Salida Almuerzo</option>
+              <option value="entrada_almuerzo">Regreso Almuerzo</option>
+              <option value="salida_laboral">Salida Laboral</option>
+              <option value="entrada">Entrada (Legacy)</option>
+              <option value="salida">Salida (Legacy)</option>
+            </select>
           </div>
 
           <div className="flex items-end gap-2">
             <button
               type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
             >
               Filtrar
             </button>
             <Link
               href="/admin/attendance"
-              className="px-4 py-2.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-medium transition-colors"
+              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-medium transition-colors"
             >
               Limpiar
             </Link>
