@@ -22,6 +22,7 @@ interface AdminEmployeesClientProps {
 export default function AdminEmployeesClient({ initialEmployees }: AdminEmployeesClientProps) {
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -37,36 +38,108 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
     dias_presenciales: [],
   });
 
+  const diasSemana = [
+    { num: 0, nombre: "Domingo" },
+    { num: 1, nombre: "Lunes" },
+    { num: 2, nombre: "Martes" },
+    { num: 3, nombre: "Miércoles" },
+    { num: 4, nombre: "Jueves" },
+    { num: 5, nombre: "Viernes" },
+    { num: 6, nombre: "Sábado" },
+  ];
+
+  const openCreateModal = () => {
+    setForm({
+      nombre: "",
+      email: "",
+      password: "",
+      role: "employee",
+      modalidad: "presencial",
+      dias_presenciales: [],
+    });
+    setEditingId(null);
+    setFormError(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (emp: Employee) => {
+    setForm({
+      nombre: emp.nombre,
+      email: emp.email,
+      password: "",
+      role: emp.role,
+      modalidad: emp.modalidad,
+      dias_presenciales: emp.dias_presenciales || [],
+    });
+    setEditingId(emp.id);
+    setFormError(null);
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormLoading(true);
 
     try {
-      const res = await fetch("/api/employees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const json = await res.json();
+      if (editingId) {
+        // Editar empleado existente
+        const res = await fetch(`/api/employees/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: form.nombre,
+            email: form.email,
+            role: form.role,
+            modalidad: form.modalidad,
+            dias_presenciales: form.dias_presenciales,
+          }),
+        });
+        const json = await res.json();
 
-      if (!res.ok) {
-        setFormError(json.error ?? "Error al crear empleado");
-        return;
+        if (!res.ok) {
+          setFormError(json.error ?? "Error al actualizar empleado");
+          return;
+        }
+
+        setModalOpen(false);
+        setSuccessMsg("Empleado actualizado correctamente");
+        setTimeout(() => setSuccessMsg(null), 3000);
+        setEmployees((prev) =>
+          prev.map((e) => (e.id === editingId ? json.data : e))
+        );
+      } else {
+        // Crear nuevo empleado
+        if (!form.password) {
+          setFormError("La contraseña es requerida para crear un nuevo empleado");
+          return;
+        }
+
+        const res = await fetch("/api/employees", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          setFormError(json.error ?? "Error al crear empleado");
+          return;
+        }
+
+        setModalOpen(false);
+        setForm({
+          nombre: "",
+          email: "",
+          password: "",
+          role: "employee",
+          modalidad: "presencial",
+          dias_presenciales: [],
+        });
+        setSuccessMsg("Empleado creado correctamente");
+        setTimeout(() => setSuccessMsg(null), 3000);
+        setEmployees([...employees, json.data]);
       }
-
-      setModalOpen(false);
-      setForm({
-        nombre: "",
-        email: "",
-        password: "",
-        role: "employee",
-        modalidad: "presencial",
-        dias_presenciales: [],
-      });
-      setSuccessMsg("Empleado creado correctamente");
-      setTimeout(() => setSuccessMsg(null), 3000);
-      setEmployees([...employees, json.data]);
     } catch {
       setFormError("Error de conexión. Por favor intenta nuevamente.");
     } finally {
@@ -109,7 +182,7 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
             Gestiona el equipo de tu empresa
           </p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button onClick={openCreateModal}>
           <svg
             className="w-4 h-4"
             fill="none"
@@ -252,7 +325,13 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
                     <td className="px-6 py-4 text-gray-400 text-xs">
                       {new Date(emp.fecha_creacion).toLocaleDateString("es-AR")}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right flex gap-2 justify-end">
+                      <button
+                        onClick={() => openEditModal(emp)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        Editar
+                      </button>
                       <button
                         onClick={() => toggleActivo(emp)}
                         disabled={togglingId === emp.id}
@@ -279,8 +358,9 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
         onClose={() => {
           setModalOpen(false);
           setFormError(null);
+          setEditingId(null);
         }}
-        title="Agregar empleado"
+        title={editingId ? "Editar empleado" : "Agregar empleado"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && (
@@ -306,16 +386,18 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
             placeholder="juan@empresa.com"
           />
 
-          <Input
-            label="Contraseña"
-            type="password"
-            required
-            value={form.password}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, password: e.target.value }))
-            }
-            placeholder="••••••••"
-          />
+          {!editingId && (
+            <Input
+              label="Contraseña"
+              type="password"
+              required
+              value={form.password}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, password: e.target.value }))
+              }
+              placeholder="••••••••"
+            />
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-1.5">
@@ -346,6 +428,7 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
                 setForm((p) => ({
                   ...p,
                   modalidad: e.target.value as "presencial" | "remoto" | "hibrido",
+                  dias_presenciales: e.target.value === "hibrido" ? p.dias_presenciales : [],
                 }))
               }
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
@@ -356,16 +439,52 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
             </select>
           </div>
 
+          {form.modalidad === "hibrido" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2.5">
+                Días presenciales
+              </label>
+              <div className="space-y-2">
+                {diasSemana.map((dia) => (
+                  <label key={dia.num} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.dias_presenciales.includes(dia.num)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setForm((p) => ({
+                            ...p,
+                            dias_presenciales: [...p.dias_presenciales, dia.num].sort(),
+                          }));
+                        } else {
+                          setForm((p) => ({
+                            ...p,
+                            dias_presenciales: p.dias_presenciales.filter((d) => d !== dia.num),
+                          }));
+                        }
+                      }}
+                      className="rounded border-gray-300 cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-700">{dia.nombre}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-end pt-4">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setModalOpen(false)}
+              onClick={() => {
+                setModalOpen(false);
+                setEditingId(null);
+              }}
             >
               Cancelar
             </Button>
             <Button type="submit" loading={formLoading}>
-              Crear empleado
+              {editingId ? "Actualizar" : "Crear empleado"}
             </Button>
           </div>
         </form>
