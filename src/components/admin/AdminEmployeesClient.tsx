@@ -10,7 +10,7 @@ interface EmployeeFormData {
   nombre: string;
   email: string;
   password: string;
-  role: "admin" | "employee";
+  role: "admin" | "employee" | "super_admin";
   modalidad: "presencial" | "remoto" | "hibrido";
   dias_presenciales: number[];
 }
@@ -408,7 +408,7 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
               onChange={(e) =>
                 setForm((p) => ({
                   ...p,
-                  role: e.target.value as "admin" | "employee",
+                  role: e.target.value as "admin" | "employee" | "super_admin",
                 }))
               }
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
