@@ -50,6 +50,7 @@ export default async function AttendancePage({
       distancia_empresa_metros,
       valido,
       foto_url,
+      firma_url,
       employees (nombre, email)
     `,
       { count: "exact" }
@@ -80,18 +81,34 @@ export default async function AttendancePage({
 
   const totalPages = Math.ceil((count ?? 0) / limit);
 
-  // Generate signed URLs for records that have photos (1 hour expiry)
-  const signedUrls: Record<string, string> = {};
+  // Generate signed URLs for photos and signatures (1 hour expiry)
+  const signedPhotoUrls: Record<string, string> = {};
+  const signedSignatureUrls: Record<string, string> = {};
+
   const photoPaths = records
     ?.map((r) => r.foto_url)
     .filter((f): f is string => !!f) ?? [];
+  const signaturePaths = records
+    ?.map((r) => r.firma_url)
+    .filter((f): f is string => !!f) ?? [];
+
   if (photoPaths.length > 0) {
     const serviceClient = await createServiceClient();
     const { data: signed } = await serviceClient.storage
       .from("attendance-photos")
       .createSignedUrls(photoPaths, 3600);
     signed?.forEach((item) => {
-      if (item.signedUrl && item.path) signedUrls[item.path] = item.signedUrl;
+      if (item.signedUrl && item.path) signedPhotoUrls[item.path] = item.signedUrl;
+    });
+  }
+
+  if (signaturePaths.length > 0) {
+    const serviceClient = await createServiceClient();
+    const { data: signed } = await serviceClient.storage
+      .from("attendance-signatures")
+      .createSignedUrls(signaturePaths, 3600);
+    signed?.forEach((item) => {
+      if (item.signedUrl && item.path) signedSignatureUrls[item.path] = item.signedUrl;
     });
   }
 
@@ -240,6 +257,9 @@ export default async function AttendancePage({
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Foto
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Firma
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -303,16 +323,33 @@ export default async function AttendancePage({
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          {record.foto_url && signedUrls[record.foto_url] ? (
+                          {record.foto_url && signedPhotoUrls[record.foto_url] ? (
                             <a
-                              href={signedUrls[record.foto_url]}
+                              href={signedPhotoUrls[record.foto_url]}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
                               <img
-                                src={signedUrls[record.foto_url]}
+                                src={signedPhotoUrls[record.foto_url]}
                                 alt="Foto asistencia"
                                 className="w-10 h-10 rounded-lg object-cover border border-gray-200 hover:scale-150 transition-transform cursor-zoom-in"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {record.firma_url && signedSignatureUrls[record.firma_url] ? (
+                            <a
+                              href={signedSignatureUrls[record.firma_url]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img
+                                src={signedSignatureUrls[record.firma_url]}
+                                alt="Firma"
+                                className="w-10 h-10 rounded-lg object-contain border border-gray-200 bg-white hover:scale-150 transition-transform cursor-zoom-in"
                               />
                             </a>
                           ) : (
