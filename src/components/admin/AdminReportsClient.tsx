@@ -32,6 +32,7 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
   const [summary, setSummary] = useState<EmployeeSummary[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingSummary, setExportingSummary] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fechaInicio = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -92,6 +93,35 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
     }
   };
 
+  const handleExportSummary = async () => {
+    setExportingSummary(true);
+    try {
+      const params = new URLSearchParams({
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+      });
+      const res = await fetch(`/api/attendance/export-summary?${params}`);
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? "Error al exportar");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resumen_horas_${year}_${String(month).padStart(2, "0")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Error al exportar el resumen");
+    } finally {
+      setExportingSummary(false);
+    }
+  };
+
   const monthNames = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -146,27 +176,48 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
             </div>
           </div>
 
-          <Button
-            onClick={handleExportExcel}
-            loading={exporting}
-            disabled={summary.length === 0}
-            className="sm:ml-auto"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex gap-2 sm:ml-auto">
+            <Button
+              onClick={handleExportExcel}
+              loading={exporting}
+              disabled={summary.length === 0}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            Exportar Excel
-          </Button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Detalle
+            </Button>
+            <Button
+              onClick={handleExportSummary}
+              loading={exportingSummary}
+              disabled={summary.length === 0}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Resumen
+            </Button>
+          </div>
         </div>
       </div>
 
