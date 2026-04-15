@@ -20,12 +20,18 @@ export default async function AdminDashboardPage() {
 
   const supabase = await createClient();
 
+  // Calculate last 5 days for tardiness pattern detection
+  const last5DaysStart = new Date(today);
+  last5DaysStart.setDate(last5DaysStart.getDate() - 5);
+  const last5DaysStartStr = last5DaysStart.toISOString();
+
   // Run all queries in parallel
   const [
     { count: totalEmpleados, data: allEmpleados },
     { data: entradas },
     { data: registrosHoy },
     { data: company },
+    { data: entradasUltimos5Dias },
   ] = await Promise.all([
     supabase
       .from("employees")
@@ -64,6 +70,15 @@ export default async function AdminDashboardPage() {
       .select("nombre_empresa, hora_entrada, hora_salida, tolerancia_minutos")
       .eq("id", empresa_id)
       .single(),
+
+    supabase
+      .from("attendance")
+      .select("empleado_id, tipo_registro, fecha_hora")
+      .eq("empresa_id", empresa_id)
+      .in("tipo_registro", ["entrada", "entrada_laboral"])
+      .gte("fecha_hora", last5DaysStartStr)
+      .lte("fecha_hora", todayEnd)
+      .order("fecha_hora", { ascending: false }),
   ]);
 
   const presentesHoy = new Set(entradas?.map((e) => e.empleado_id)).size;
@@ -85,10 +100,16 @@ export default async function AdminDashboardPage() {
     nombre: string;
     horaEntrada: string;
   }
+  interface AlertaAtrasosSeguidos {
+    id: string;
+    nombre: string;
+    diasAtrasos: number;
+  }
 
   const tardanzas: AlertaTardanza[] = [];
   const ausentes: AlertaAusente[] = [];
   const sinSalida: AlertaSinSalida[] = [];
+  const atrasosSeguidos: AlertaAtrasosSeguidos[] = [];
 
   if (company && allEmpleados && entradas) {
     const horaEntradaStr = company.hora_entrada || "09:00";
@@ -106,34 +127,48 @@ export default async function AdminDashboardPage() {
     horaSalidaEsperada.setHours(salidaHour, salidaMin, 0, 0);
 
     const ahora = new Date();
-    const horaSinSalidaAlerta = new Date(horaSalidaEsperada.getTime() + 40 * 60 * 1000);
 
-    // Track employee entries and exits
-    const empleadoEntrada = new Map<string, { fecha_hora: string; tipo_registro: string }>();
-    const empleadoSalida = new Map<string, string>();
+    // Track employee entries and exits TODAY
+    const empleadoEntradaHoy = new Map<string, { fecha_hora: string; tipo_registro: string }>();
+    const empleadoSalidaHoy = new Map<string, boolean>();
 
     for (const reg of entradas) {
       if (["entrada", "entrada_laboral"].includes(reg.tipo_registro)) {
-        empleadoEntrada.set(reg.empleado_id, { fecha_hora: reg.fecha_hora, tipo_registro: reg.tipo_registro });
+        empleadoEntradaHoy.set(reg.empleado_id, { fecha_hora: reg.fecha_hora, tipo_registro: reg.tipo_registro });
       }
     }
 
     for (const reg of registrosHoy ?? []) {
       if (["salida", "salida_laboral"].includes(reg.tipo_registro)) {
-        empleadoSalida.set(reg.id, reg.id); // Just mark as present
+        const empName = (reg.employees as any)?.nombre;
+        const emp = allEmpleados?.find((e) => e.nombre === empName);
+        if (emp) {
+          empleadoSalidaHoy.set(emp.id, true);
+        }
       }
+    }
+
+    // Build map of last entry per day for last 5 days (for tardiness pattern detection)
+    const entradaPorDia = new Map<string, Map<string, { fecha_hora: string }>>();
+    for (const reg of entradasUltimos5Dias || []) {
+      const fecha = reg.fecha_hora.split("T")[0];
+      if (!entradaPorDia.has(fecha)) {
+        entradaPorDia.set(fecha, new Map());
+      }
+      const mapaEmpleados = entradaPorDia.get(fecha)!;
+      mapaEmpleados.set(reg.empleado_id, { fecha_hora: reg.fecha_hora });
     }
 
     // Check each employee
     for (const emp of allEmpleados) {
-      const tieneEntrada = empleadoEntrada.has(emp.id);
+      const tieneEntradaHoy = empleadoEntradaHoy.has(emp.id);
 
-      if (!tieneEntrada) {
-        // Ausente
+      if (!tieneEntradaHoy) {
+        // Ausente: no marcó entrada hoy
         ausentes.push({ id: emp.id, nombre: emp.nombre });
       } else {
-        // Has entrada, check for tardanza
-        const entradaReg = empleadoEntrada.get(emp.id)!;
+        // Has entrada today, check for tardanza
+        const entradaReg = empleadoEntradaHoy.get(emp.id)!;
         const horaEntradaReal = new Date(entradaReg.fecha_hora);
         const horaEntradaFormato = horaEntradaReal.toLocaleTimeString("es-AR", {
           hour: "2-digit",
@@ -154,41 +189,57 @@ export default async function AdminDashboardPage() {
             minutosLate,
             horaEntrada: horaEntradaFormato,
           });
-        }
 
-        // Check sin salida (if after 40 min from expected exit and no salida)
-        if (ahora > horaSinSalidaAlerta) {
-          const tieneSalida = registrosHoy?.some(
-            (r) =>
-              r.id &&
-              (registrosHoy || []).some(
-                (reg) =>
-                  reg.tipo_registro && ["salida", "salida_laboral"].includes(reg.tipo_registro)
-              )
-          );
+          // Check for consecutive tardiness (3+ days in last 5 days)
+          let diasAtrasos = 0;
+          let consecutivos = 0;
+          const fechasOrdenadas = Array.from(entradaPorDia.keys()).sort().reverse();
 
-          // Simpler check: look for any salida_laboral or salida for this employee today
-          const empleadoEnRegistros = (registrosHoy || []).find((r) => {
-            const emp_name = (r.employees as any)?.nombre === allEmpleados.find((e) => e.id === emp.id)?.nombre;
-            return emp_name;
-          });
+          for (const fecha of fechasOrdenadas) {
+            const mapaEmpleados = entradaPorDia.get(fecha)!;
+            if (mapaEmpleados.has(emp.id)) {
+              const entradaEnEseFecha = mapaEmpleados.get(emp.id)!;
+              const horaEntradaEnEseFecha = new Date(entradaEnEseFecha.fecha_hora);
+              const horaEsperadaEnEseFecha = new Date();
+              const [year, month, day] = fecha.split("-");
+              horaEsperadaEnEseFecha.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
+              horaEsperadaEnEseFecha.setHours(entradaHour, entradaMin, 0, 0);
 
-          let hasSalida = false;
-          if (empleadoEnRegistros) {
-            hasSalida = (registrosHoy || []).some(
-              (r) =>
-                (r.employees as any)?.nombre === emp.nombre &&
-                ["salida", "salida_laboral"].includes(r.tipo_registro)
-            );
+              const minutosLateEnEseFecha = Math.floor(
+                (horaEntradaEnEseFecha.getTime() - horaEsperadaEnEseFecha.getTime()) / (1000 * 60)
+              );
+
+              if (minutosLateEnEseFecha > toleranciaMinutos) {
+                consecutivos++;
+                if (consecutivos >= 3) {
+                  diasAtrasos = consecutivos;
+                  break;
+                }
+              } else {
+                consecutivos = 0; // Reset si no hay atraso
+              }
+            } else {
+              consecutivos = 0; // Reset si no hay registro
+            }
           }
 
-          if (!hasSalida) {
-            sinSalida.push({
+          if (diasAtrasos >= 3) {
+            atrasosSeguidos.push({
               id: emp.id,
               nombre: emp.nombre,
-              horaEntrada: horaEntradaFormato,
+              diasAtrasos,
             });
           }
+        }
+
+        // Check sin salida: if past expected exit time + 40 min and no exit marked
+        const horaSinSalidaAlerta = new Date(horaSalidaEsperada.getTime() + 40 * 60 * 1000);
+        if (ahora > horaSinSalidaAlerta && !empleadoSalidaHoy.has(emp.id)) {
+          sinSalida.push({
+            id: emp.id,
+            nombre: emp.nombre,
+            horaEntrada: horaEntradaFormato,
+          });
         }
       }
     }
@@ -222,6 +273,7 @@ export default async function AdminDashboardPage() {
         tardanzas={tardanzas}
         ausentes={ausentes}
         sinSalida={sinSalida}
+        atrasosSeguidos={atrasosSeguidos}
       />
 
       {/* Stats */}

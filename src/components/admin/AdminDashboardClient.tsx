@@ -18,18 +18,26 @@ interface AlertaSinSalida {
   horaEntrada: string;
 }
 
+interface AlertaAtrasosSeguidos {
+  id: string;
+  nombre: string;
+  diasAtrasos: number;
+}
+
 interface AdminDashboardClientProps {
   tardanzas: AlertaTardanza[];
   ausentes: AlertaAusente[];
   sinSalida: AlertaSinSalida[];
+  atrasosSeguidos: AlertaAtrasosSeguidos[];
 }
 
 export function AdminDashboardAlerts({
   tardanzas,
   ausentes,
   sinSalida,
+  atrasosSeguidos,
 }: AdminDashboardClientProps) {
-  const tieneAlertas = tardanzas.length > 0 || ausentes.length > 0 || sinSalida.length > 0;
+  const tieneAlertas = tardanzas.length > 0 || ausentes.length > 0 || sinSalida.length > 0 || atrasosSeguidos.length > 0;
 
   if (!tieneAlertas) {
     return (
@@ -124,6 +132,32 @@ export function AdminDashboardAlerts({
                 <div key={emp.id} className="text-sm">
                   <p className="text-gray-600 truncate font-medium">{emp.nombre}</p>
                   <p className="text-red-600 text-xs">Entró: {emp.horaEntrada}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Atrasos seguidos */}
+        {atrasosSeguidos.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2h1a1 1 0 100-2h-1a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2h-1a1 1 0 100 2h1a1 1 0 110 2H6a1 1 0 110-2h1a2 2 0 00-2-2H4zm0 5a1 1 0 100 2v4a1 1 0 100-2v-4zm6-3a1 1 0 110 2 1 1 0 010-2z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Atrasos Seguidos</p>
+                <p className="text-lg font-bold text-purple-600">{atrasosSeguidos.length}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {atrasosSeguidos.map((emp) => (
+                <div key={emp.id} className="text-sm">
+                  <p className="text-gray-600 truncate font-medium">{emp.nombre}</p>
+                  <p className="text-purple-600 text-xs">⚠️ {emp.diasAtrasos} días con atraso → Requiere conversación</p>
                 </div>
               ))}
             </div>
