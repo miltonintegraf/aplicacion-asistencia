@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -71,6 +71,24 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  useEffect(() => {
+    const prefetchAll = () => navItems.forEach((item) => {
+      router.prefetch(item.href);
+    });
+
+    const idleId = window.requestIdleCallback
+      ? window.requestIdleCallback(prefetchAll)
+      : window.setTimeout(prefetchAll, 800);
+
+    return () => {
+      if (window.cancelIdleCallback && typeof idleId === "number") {
+        window.cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
+  }, [router]);
+
   const handleLogout = async () => {
     setLoggingOut(true);
     const supabase = await createClient();
@@ -87,6 +105,9 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            prefetch
+            onMouseEnter={() => router.prefetch(item.href)}
+            onFocus={() => router.prefetch(item.href)}
             onClick={() => setMobileOpen(false)}
             className={`
               flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors

@@ -41,7 +41,7 @@ export function AdminDashboardAlerts({
 
   if (!tieneAlertas) {
     return (
-      <div className="mb-8 bg-green-50 border border-green-200 rounded-xl p-6 flex items-center gap-3">
+      <div className="mb-8 bg-green-50 border border-green-200 rounded-xl p-6 flex items-center gap-3 shadow-md shadow-green-100/70">
         <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -62,10 +62,10 @@ export function AdminDashboardAlerts({
         Alertas del día
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
         {/* Ausentes */}
         {ausentes.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
@@ -89,7 +89,7 @@ export function AdminDashboardAlerts({
 
         {/* Tardanzas */}
         {tardanzas.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
@@ -115,7 +115,7 @@ export function AdminDashboardAlerts({
 
         {/* Sin salida */}
         {sinSalida.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
@@ -140,7 +140,7 @@ export function AdminDashboardAlerts({
 
         {/* Atrasos seguidos */}
         {atrasosSeguidos.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">

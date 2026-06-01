@@ -44,8 +44,8 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         hora_salida: initialCompany.hora_salida || "18:00",
         tolerancia_minutos: String(initialCompany.tolerancia_minutos || "15"),
       });
-      setLoading(false);
     }
+    setLoading(false);
   }, [initialCompany]);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -165,7 +165,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Company data */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">
             Datos de la empresa
           </h2>
@@ -191,7 +191,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         </div>
 
         {/* GPS settings */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">
             Configuración GPS
           </h2>
@@ -301,7 +301,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         </div>
 
         {/* Foto y firma requerida */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">
             Registro de asistencia
           </h2>
@@ -364,7 +364,7 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         </div>
 
         {/* Horario laboral */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">
             Horario laboral
           </h2>

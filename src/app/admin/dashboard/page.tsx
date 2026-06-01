@@ -254,7 +254,7 @@ export default async function AdminDashboardPage() {
   });
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
@@ -277,7 +277,7 @@ export default async function AdminDashboardPage() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5 mb-8">
         <StatsCard
           label="Total empleados"
           value={totalEmpleados ?? 0}
