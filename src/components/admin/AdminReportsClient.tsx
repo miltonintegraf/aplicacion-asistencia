@@ -51,6 +51,7 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
   const [loadingData, setLoadingData] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingSummary, setExportingSummary] = useState(false);
+  const [exportingLegal, setExportingLegal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const weekStartDate = new Date(`${weekStart}T00:00:00`);
@@ -143,6 +144,35 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
       setError("Error al exportar el resumen");
     } finally {
       setExportingSummary(false);
+    }
+  };
+
+  const handleExportLegal = async () => {
+    setExportingLegal(true);
+    try {
+      const params = new URLSearchParams({
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+      });
+      const res = await fetch(`/api/attendance/export-legal?${params}`);
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? "Error al exportar reporte fiscalizable");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_fiscalizacion_${fechaInicio}_${fechaFin}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Error al exportar el reporte fiscalizable");
+    } finally {
+      setExportingLegal(false);
     }
   };
 
@@ -255,7 +285,27 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
             )}
           </div>
 
-          <div className="flex gap-2 sm:ml-auto">
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
+            <Button
+              onClick={handleExportLegal}
+              loading={exportingLegal}
+              disabled={summary.length === 0}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+              Fiscalización
+            </Button>
             <Button
               onClick={handleExportExcel}
               loading={exporting}
