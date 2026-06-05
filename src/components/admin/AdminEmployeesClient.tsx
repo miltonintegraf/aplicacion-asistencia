@@ -378,30 +378,55 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
                     <td className="px-6 py-4 text-gray-400 text-xs">
                       {new Date(emp.fecha_creacion).toLocaleDateString("es-AR")}
                     </td>
-                    <td className="px-6 py-4 text-right flex gap-2 justify-end">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => openEditModal(emp)}
-                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        title="Editar empleado"
+                        aria-label={`Editar ${emp.nombre}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                       >
-                        Editar
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
                       </button>
                       <button
                         onClick={() => toggleActivo(emp)}
                         disabled={togglingId === emp.id}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                        title={emp.activo ? "Desactivar empleado" : "Activar empleado"}
+                        aria-label={`${emp.activo ? "Desactivar" : "Activar"} ${emp.nombre}`}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
                           emp.activo
-                            ? "bg-red-50 text-red-600 hover:bg-red-100"
+                            ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
                             : "bg-green-50 text-green-600 hover:bg-green-100"
                         } disabled:opacity-50`}
                       >
-                        {togglingId === emp.id ? "Procesando..." : emp.activo ? "Desactivar" : "Activar"}
+                        {togglingId === emp.id ? (
+                          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : emp.activo ? (
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636L5.636 18.364M7 5h10a2 2 0 012 2v10M5 7v10a2 2 0 002 2h10" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
                       </button>
                       <button
                         onClick={() => openDeleteModal(emp)}
-                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                        title="Eliminar empleado"
+                        aria-label={`Eliminar ${emp.nombre}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                       >
-                        Eliminar
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
