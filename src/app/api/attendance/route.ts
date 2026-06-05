@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { calcularDistancia } from "@/lib/haversine";
 import type { CreateAttendancePayload } from "@/lib/types";
+import { getTodayAttendanceRecords } from "@/lib/attendance/today";
+
+function getRequestIp(request: NextRequest) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0]?.trim() ?? null;
+  return request.headers.get("x-real-ip") ?? null;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,6 +52,7 @@ export async function GET(request: NextRequest) {
         empleado_id,
         tipo_registro,
         fecha_hora,
+        estado_registro,
         latitud,
         longitud,
         distancia_empresa_metros,
@@ -58,6 +66,7 @@ export async function GET(request: NextRequest) {
         { count: "exact" }
       )
       .eq("empresa_id", currentEmployee.empresa_id)
+      .neq("estado_registro", "anulado")
       .order("fecha_hora", { ascending: false });
 
     // Employees can only see their own records
@@ -149,19 +158,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enforce 4-step sequence: entrada_laboral → salida_almuerzo → entrada_almuerzo → salida_laboral
-    const today = new Date();
-    const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const dayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-
-    const { data: todayRecords, error: recordsError } = await supabase
+    // Enforce 4-step sequence using Chile's local day:
+    // entrada_laboral → salida_almuerzo → entrada_almuerzo → salida_laboral
+    const { data: recentRecords, error: recordsError } = await supabase
       .from("attendance")
-      .select("tipo_registro")
+      .select("tipo_registro, fecha_hora")
       .eq("empresa_id", currentEmployee.empresa_id)
       .eq("empleado_id", user.id)
-      .gte("fecha_hora", dayStart.toISOString())
-      .lt("fecha_hora", dayEnd.toISOString())
-      .order("fecha_hora", { ascending: true });
+      .neq("estado_registro", "anulado")
+      .order("fecha_hora", { ascending: false })
+      .limit(20);
 
     if (recordsError) {
       return NextResponse.json(
@@ -169,6 +175,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    const todayRecords = getTodayAttendanceRecords(recentRecords || []);
 
     // Normalize legacy types for sequence checking
     const normalizedRecords = (todayRecords || []).map((r) => {
@@ -196,7 +204,11 @@ export async function POST(request: NextRequest) {
     const expectedNextStep = expectedSequence[normalizedRecords.length];
     if (body.tipo_registro !== expectedNextStep) {
       return NextResponse.json(
-        { error: `Secuencia inválida. Se esperaba: ${expectedNextStep}` },
+        {
+          error: `Secuencia inválida. Se esperaba: ${expectedNextStep}`,
+          expected_next_step: expectedNextStep,
+          today_records: todayRecords,
+        },
         { status: 422 }
       );
     }
@@ -339,6 +351,14 @@ export async function POST(request: NextRequest) {
       valido,
       foto_url,
       firma_url,
+      created_by: user.id,
+      request_ip: getRequestIp(request),
+      user_agent: request.headers.get("user-agent"),
+      client_metadata: {
+        modalidad: currentEmployee.modalidad,
+        requiere_validacion_ubicacion: requiresLocationValidation,
+        origen: "employee_dashboard",
+      },
     };
 
     // Add duracion_colacion_minutos only for salida_almuerzo

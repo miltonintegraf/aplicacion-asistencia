@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AttendanceButtons } from "@/components/employee/AttendanceButtons";
 import { LogoutButton } from "@/components/employee/LogoutButton";
+import { getTodayAttendanceRecords } from "@/lib/attendance/today";
 
 export default async function EmployeeDashboardPage() {
   const supabase = await createClient();
@@ -65,6 +66,17 @@ export default async function EmployeeDashboardPage() {
     .eq("id", employee.empresa_id)
     .single();
 
+  const { data: recentRecords } = await supabase
+    .from("attendance")
+    .select("id, tipo_registro, fecha_hora, duracion_colacion_minutos")
+    .eq("empresa_id", employee.empresa_id)
+    .eq("empleado_id", user.id)
+    .neq("estado_registro", "anulado")
+    .order("fecha_hora", { ascending: false })
+    .limit(20);
+
+  const initialRecords = getTodayAttendanceRecords(recentRecords ?? []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -120,6 +132,7 @@ export default async function EmployeeDashboardPage() {
             firmaRequerida={company?.firma_requerida ?? false}
             modalidad={employee?.modalidad ?? "presencial"}
             diasPresenciales={employee?.dias_presenciales ?? []}
+            initialRecords={initialRecords}
           />
         </div>
 

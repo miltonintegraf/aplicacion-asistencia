@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { logSuperAdminAction } from "@/lib/super-admin/audit";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -99,6 +100,14 @@ export async function PATCH(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  await logSuperAdminAction(serviceSupabase, {
+    actorId: user.id,
+    action: "update_company_subscription",
+    targetType: "company",
+    targetId: id,
+    metadata: updateData,
+  });
 
   return NextResponse.json({ message: "Empresa actualizada" });
 }

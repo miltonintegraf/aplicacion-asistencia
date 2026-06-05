@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
         fecha_hora,
         distancia_empresa_metros,
         valido,
+        estado_registro,
         duracion_colacion_minutos,
         employees (
           nombre,
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq("empresa_id", currentEmployee.empresa_id)
+      .neq("estado_registro", "anulado")
       .order("fecha_hora", { ascending: true });
 
     if (empleado_id) {

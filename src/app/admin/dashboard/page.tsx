@@ -44,6 +44,7 @@ export default async function AdminDashboardPage() {
       .from("attendance")
       .select("empleado_id, tipo_registro, fecha_hora")
       .eq("empresa_id", empresa_id)
+      .neq("estado_registro", "anulado")
       .in("tipo_registro", ["entrada", "entrada_laboral"])
       .gte("fecha_hora", todayStart)
       .lte("fecha_hora", todayEnd),
@@ -61,6 +62,7 @@ export default async function AdminDashboardPage() {
       `
       )
       .eq("empresa_id", empresa_id)
+      .neq("estado_registro", "anulado")
       .gte("fecha_hora", todayStart)
       .lte("fecha_hora", todayEnd)
       .order("fecha_hora", { ascending: false }),
@@ -75,6 +77,7 @@ export default async function AdminDashboardPage() {
       .from("attendance")
       .select("empleado_id, tipo_registro, fecha_hora")
       .eq("empresa_id", empresa_id)
+      .neq("estado_registro", "anulado")
       .in("tipo_registro", ["entrada", "entrada_laboral"])
       .gte("fecha_hora", last5DaysStartStr)
       .lte("fecha_hora", todayEnd)

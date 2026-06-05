@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { buildAttendanceSummary } from "@/lib/reports/attendanceSummary";
 import * as XLSX from "xlsx";
 
 export async function GET(request: NextRequest) {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Get company settings
     const { data: company } = await supabase
       .from("companies")
-      .select("hora_entrada, hora_salida")
+      .select("hora_entrada, hora_salida, horarios_laborales")
       .eq("id", currentEmployee.empresa_id)
       .single();
 
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       .from("attendance")
       .select("empleado_id, tipo_registro, fecha_hora, duracion_colacion_minutos")
       .eq("empresa_id", currentEmployee.empresa_id)
+      .neq("estado_registro", "anulado")
       .gte("fecha_hora", fecha_inicio)
       .lte("fecha_hora", fecha_fin)
       .order("fecha_hora", { ascending: true });
@@ -63,90 +65,32 @@ export async function GET(request: NextRequest) {
       .eq("activo", true)
       .neq("role", "admin");
 
-    // Parse company times
-    const [entradaHour, entradaMin] = (company?.hora_entrada || "09:00")
-      .split(":")
-      .map(Number);
-    const [salidaHour, salidaMin] = (company?.hora_salida || "18:00")
-      .split(":")
-      .map(Number);
-
-    const horaEntradaMinutos = entradaHour * 60 + entradaMin;
-    const horaSalidaMinutos = salidaHour * 60 + salidaMin;
-    const horasEstimadas = (horaSalidaMinutos - horaEntradaMinutos) / 60;
-
-    interface Summary {
-      dias: Set<string>;
-      horasTrabajadas: number;
-      ultimaEntrada: string | null;
-    }
-
-    const summaryMap: Record<string, Summary> = {};
-
-    for (const emp of employees || []) {
-      summaryMap[emp.id] = {
-        dias: new Set(),
-        horasTrabajadas: 0,
-        ultimaEntrada: null,
-      };
-    }
-
-    for (const record of records || []) {
-      if (!summaryMap[record.empleado_id]) {
-        summaryMap[record.empleado_id] = {
-          dias: new Set(),
-          horasTrabajadas: 0,
-          ultimaEntrada: null,
-        };
-      }
-
-      const fecha = record.fecha_hora.split("T")[0];
-
-      if (
-        record.tipo_registro === "entrada" ||
-        record.tipo_registro === "entrada_laboral"
-      ) {
-        summaryMap[record.empleado_id].dias.add(fecha);
-        summaryMap[record.empleado_id].ultimaEntrada = record.fecha_hora;
-      }
-
-      if (
-        record.tipo_registro === "salida" ||
-        record.tipo_registro === "salida_laboral"
-      ) {
-        if (summaryMap[record.empleado_id].ultimaEntrada) {
-          const entrada = new Date(summaryMap[record.empleado_id].ultimaEntrada!);
-          const salida = new Date(record.fecha_hora);
-          let horasTrabajadas = (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
-
-          if (record.duracion_colacion_minutos) {
-            horasTrabajadas -= record.duracion_colacion_minutos / 60;
-          }
-
-          summaryMap[record.empleado_id].horasTrabajadas += Math.max(0, horasTrabajadas);
-        }
-      }
-    }
+    const summary = buildAttendanceSummary({
+      employees: employees || [],
+      records: records || [],
+      company,
+      fechaInicio: fecha_inicio,
+      fechaFin: fecha_fin,
+    });
 
     // Build export data
-    const resumenData = (employees || [])
-      .filter((emp) => summaryMap[emp.id].dias.size > 0)
-      .map((emp) => {
-        const diasTrabajados = summaryMap[emp.id].dias.size;
-        const horasEst = diasTrabajados * horasEstimadas;
-        const horasTrab = summaryMap[emp.id].horasTrabajadas;
-        const diferencia = horasTrab - horasEst;
-
-        return {
-          Empleado: emp.nombre,
-          Email: emp.email,
-          "Días Trabajados": diasTrabajados,
-          "Horas Estimadas": horasEst.toFixed(2),
-          "Horas Trabajadas": horasTrab.toFixed(2),
-          Diferencia: diferencia.toFixed(2),
-          Estado: diferencia > 0 ? "Extra" : diferencia < 0 ? "Debe" : "Completo",
-        };
-      });
+    const resumenData = summary.map((emp) => ({
+      Empleado: emp.nombre,
+      Email: emp.email,
+      "Dias Programados": emp.dias_programados,
+      "Dias Trabajados": emp.dias_trabajados,
+      "Horas Esperadas": emp.horas_estimadas.toFixed(2),
+      "Horas Trabajadas": emp.horas_trabajadas.toFixed(2),
+      "Horas Extra": emp.horas_extra.toFixed(2),
+      "Horas Debe": emp.horas_debe.toFixed(2),
+      Diferencia: emp.diferencia_horas.toFixed(2),
+      Estado:
+        emp.estado === "extra"
+          ? "Tiene horas extra"
+          : emp.estado === "debe"
+          ? "Debe horas"
+          : "Completo",
+    }));
 
     // Create workbook
     const wsData = [
@@ -162,8 +106,11 @@ export async function GET(request: NextRequest) {
       { wch: 25 },
       { wch: 30 },
       { wch: 15 },
+      { wch: 15 },
       { wch: 18 },
       { wch: 18 },
+      { wch: 15 },
+      { wch: 15 },
       { wch: 15 },
       { wch: 12 },
     ];

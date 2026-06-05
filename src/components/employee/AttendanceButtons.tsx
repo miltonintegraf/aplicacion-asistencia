@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { getTodayAttendanceRecords } from "@/lib/attendance/today";
 
 type TipoRegistro = "entrada_laboral" | "salida_almuerzo" | "entrada_almuerzo" | "salida_laboral" | "entrada" | "salida";
 type DayStep = "no_records" | "entrada_laboral" | "salida_almuerzo" | "entrada_almuerzo" | "completed";
 
 interface TodayRecord {
+  id?: string;
   tipo_registro: TipoRegistro;
   fecha_hora: string;
   duracion_colacion_minutos?: number | null;
@@ -19,6 +21,7 @@ interface AttendanceButtonsProps {
   firmaRequerida: boolean;
   modalidad: "presencial" | "remoto" | "hibrido";
   diasPresenciales: number[];
+  initialRecords?: TodayRecord[];
   duracionColacionDefault?: 30 | 45 | 60;
 }
 
@@ -31,9 +34,10 @@ function normalize(tipo: TipoRegistro): "entrada_laboral" | "salida_almuerzo" | 
 
 // Helper: determine current step from today's records
 function deriveDayStep(records: TodayRecord[]): DayStep {
-  if (records.length === 0) return "no_records";
+  const activeRecords = sortRecords(records);
+  if (activeRecords.length === 0) return "no_records";
 
-  const normalized = records.map(r => normalize(r.tipo_registro));
+  const normalized = activeRecords.map(r => normalize(r.tipo_registro));
   const lastType = normalized[normalized.length - 1];
 
   if (normalized.length === 4) return "completed";
@@ -46,23 +50,24 @@ function deriveDayStep(records: TodayRecord[]): DayStep {
 
 // Helper: compute elapsed working time in milliseconds
 function computeElapsedMs(records: TodayRecord[], now: Date): number {
-  const normalized = records.map(r => normalize(r.tipo_registro));
+  const activeRecords = sortRecords(records);
+  const normalized = activeRecords.map(r => normalize(r.tipo_registro));
 
-  if (records.length === 0) return 0;
+  if (activeRecords.length === 0) return 0;
   if (normalized.length === 4) {
     // Completed day: calculate total time minus lunch
-    const start = new Date(records[0].fecha_hora);
-    const end = new Date(records[3].fecha_hora);
+    const start = new Date(activeRecords[0].fecha_hora);
+    const end = new Date(activeRecords[3].fecha_hora);
     const totalMs = end.getTime() - start.getTime();
 
     // Lunch duration is stored in the salida_almuerzo record
-    const lunchRecord = records.find(r => r.tipo_registro === "salida_almuerzo");
+    const lunchRecord = activeRecords.find(r => r.tipo_registro === "salida_almuerzo");
     const lunchMs = (lunchRecord?.duracion_colacion_minutos ?? 0) * 60 * 1000;
 
     return Math.max(0, totalMs - lunchMs);
   }
 
-  const start = new Date(records[0].fecha_hora);
+  const start = new Date(activeRecords[0].fecha_hora);
 
   if (normalized.length === 1) {
     // Only entrada_laboral: elapsed since then (no lunch break)
@@ -71,16 +76,16 @@ function computeElapsedMs(records: TodayRecord[], now: Date): number {
 
   if (normalized.length === 2) {
     // entrada_laboral + salida_almuerzo: paused during lunch
-    const salida = new Date(records[1].fecha_hora);
+    const salida = new Date(activeRecords[1].fecha_hora);
     return salida.getTime() - start.getTime();
   }
 
   if (normalized.length === 3) {
     // entrada_laboral + salida_almuerzo + entrada_almuerzo: resume timing
-    const salida = new Date(records[1].fecha_hora);
-    const regreso = new Date(records[2].fecha_hora);
+    const salida = new Date(activeRecords[1].fecha_hora);
+    const regreso = new Date(activeRecords[2].fecha_hora);
 
-    const lunchRecord = records.find(r => r.tipo_registro === "salida_almuerzo");
+    const lunchRecord = activeRecords.find(r => r.tipo_registro === "salida_almuerzo");
     const lunchMs = (lunchRecord?.duracion_colacion_minutos ?? 0) * 60 * 1000;
 
     const beforeLunch = salida.getTime() - start.getTime();
@@ -102,19 +107,81 @@ function formatElapsed(ms: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function sortRecords(records: TodayRecord[]) {
+  return [...records].sort(
+    (a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
+  );
+}
+
+function filterTodayRecords(records: TodayRecord[]) {
+  return getTodayAttendanceRecords(records);
+}
+
+function fallbackRecordsForExpectedStep(expectedStep: string): TodayRecord[] {
+  const now = new Date().toISOString();
+
+  if (expectedStep === "salida_almuerzo") {
+    return [{ tipo_registro: "entrada_laboral", fecha_hora: now }];
+  }
+
+  if (expectedStep === "entrada_almuerzo") {
+    return [
+      { tipo_registro: "entrada_laboral", fecha_hora: now },
+      { tipo_registro: "salida_almuerzo", fecha_hora: now, duracion_colacion_minutos: 45 },
+    ];
+  }
+
+  if (expectedStep === "salida_laboral") {
+    return [
+      { tipo_registro: "entrada_laboral", fecha_hora: now },
+      { tipo_registro: "salida_almuerzo", fecha_hora: now, duracion_colacion_minutos: 45 },
+      { tipo_registro: "entrada_almuerzo", fecha_hora: now },
+    ];
+  }
+
+  return [];
+}
+
+function getExpectedStepFromError(json: any): string | null {
+  if (typeof json?.expected_next_step === "string") return json.expected_next_step;
+  if (typeof json?.error !== "string") return null;
+
+  const match = json.error.match(/Se esperaba:\s*([a-z_]+)/i);
+  return match?.[1] ?? null;
+}
+
+function dayStepBeforeExpectedStep(expectedStep: string): DayStep | null {
+  if (expectedStep === "salida_almuerzo") return "entrada_laboral";
+  if (expectedStep === "entrada_almuerzo") return "salida_almuerzo";
+  if (expectedStep === "salida_laboral") return "entrada_almuerzo";
+  return null;
+}
+
+function dayStepAfterSuccessfulMark(tipo: TipoRegistro): DayStep {
+  const normalized = normalize(tipo);
+  if (normalized === "salida_laboral") return "completed";
+  return normalized;
+}
+
 export function AttendanceButtons({
   empleadoId,
   fotoRequerida,
   firmaRequerida,
   modalidad,
   diasPresenciales,
+  initialRecords = [],
   duracionColacionDefault = 45,
 }: AttendanceButtonsProps) {
   const router = useRouter();
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [loading, setLoading] = useState<TipoRegistro | null>(null);
-  const [todayRecords, setTodayRecords] = useState<TodayRecord[]>([]);
-  const [loadingRecords, setLoadingRecords] = useState(true);
+  const [todayRecords, setTodayRecords] = useState<TodayRecord[]>(() => sortRecords(filterTodayRecords(initialRecords)));
+  const [currentDayStep, setCurrentDayStep] = useState<DayStep>(() =>
+    deriveDayStep(sortRecords(filterTodayRecords(initialRecords)))
+  );
+  const [loadingRecords, setLoadingRecords] = useState(initialRecords.length === 0);
+  const latestRecordsRef = useRef<TodayRecord[]>(sortRecords(filterTodayRecords(initialRecords)));
+  const hasLocalInteractionRef = useRef(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -142,8 +209,11 @@ export function AttendanceButtons({
   const [isDrawing, setIsDrawing] = useState(false);
   const sigCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Derive day step from records
-  const dayStep = deriveDayStep(todayRecords);
+  const dayStep = currentDayStep;
+
+  useEffect(() => {
+    latestRecordsRef.current = todayRecords;
+  }, [todayRecords]);
 
   useEffect(() => {
     setCurrentTime(new Date());
@@ -165,23 +235,32 @@ export function AttendanceButtons({
     return () => clearInterval(interval);
   }, [dayStep, todayRecords, currentTime]);
 
+  useEffect(() => {
+    setElapsedMs(computeElapsedMs(todayRecords, new Date()));
+  }, [todayRecords]);
+
   const fetchTodayRecords = useCallback(async () => {
     setLoadingRecords(true);
     try {
-      const today = new Date();
-      const dateStr = today.toISOString().split("T")[0];
       const res = await fetch(
-        `/api/attendance?empleado_id=${empleadoId}&fecha_inicio=${dateStr}&fecha_fin=${dateStr}&limit=10`
+        `/api/attendance/today?_ts=${Date.now()}`,
+        { cache: "no-store" }
       );
       const json = await res.json();
-      if (res.ok && json.data && json.data.length > 0) {
-        // Reverse to get chronological order (API returns most recent first)
-        setTodayRecords(json.data.reverse());
-      } else {
+      if (res.ok && Array.isArray(json.data) && json.data.length > 0) {
+        const freshRecords = sortRecords(json.data);
+        setTodayRecords(freshRecords);
+        setCurrentDayStep(deriveDayStep(freshRecords));
+      } else if (
+        res.ok &&
+        latestRecordsRef.current.length === 0 &&
+        !hasLocalInteractionRef.current
+      ) {
         setTodayRecords([]);
+        setCurrentDayStep("no_records");
       }
     } catch {
-      setTodayRecords([]);
+      // Keep the current screen state if the refresh fails after a successful mark.
     } finally {
       setLoadingRecords(false);
     }
@@ -368,6 +447,7 @@ export function AttendanceButtons({
     firma_base64?: string
   ) => {
     try {
+      hasLocalInteractionRef.current = true;
       const payload: any = {
         empleado_id: empleadoId,
         tipo_registro: tipo,
@@ -391,17 +471,48 @@ export function AttendanceButtons({
       const json = await res.json();
 
       if (res.ok) {
-        const hora = new Date(json.data.fecha_hora).toLocaleTimeString("es-AR", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
+        const savedRecord: TodayRecord = {
+          id: json.data?.id ?? `local-${Date.now()}`,
+          tipo_registro: json.data?.tipo_registro ?? tipo,
+          fecha_hora: json.data?.fecha_hora ?? new Date().toISOString(),
+          duracion_colacion_minutos:
+            json.data?.duracion_colacion_minutos ??
+            (tipo === "salida_almuerzo" ? lunchDuration : null),
+        };
+
+        setTodayRecords((prev) => {
+          const withoutDuplicate = prev.filter((record) => record.id !== savedRecord.id);
+          return sortRecords([...withoutDuplicate, savedRecord]);
         });
+        setCurrentDayStep(dayStepAfterSuccessfulMark(savedRecord.tipo_registro));
+
         setMessage({
           type: "success",
           text: `${json.message}${json.distancia ? ` (${json.distancia}m de la empresa)` : ""}`,
         });
-        await fetchTodayRecords();
       } else {
+        const expectedStep = getExpectedStepFromError(json);
+        const expectedVisualStep = expectedStep ? dayStepBeforeExpectedStep(expectedStep) : null;
+
+        if (expectedVisualStep) {
+          setCurrentDayStep(expectedVisualStep);
+        }
+
+        if (Array.isArray(json.today_records)) {
+          const serverRecords = sortRecords(json.today_records);
+          setTodayRecords(
+            serverRecords.length > 0 || !expectedStep
+              ? serverRecords
+              : fallbackRecordsForExpectedStep(expectedStep)
+          );
+        } else {
+          await fetchTodayRecords();
+          if (expectedStep) {
+            setTodayRecords((current) =>
+              current.length > 0 ? current : fallbackRecordsForExpectedStep(expectedStep)
+            );
+          }
+        }
         setMessage({
           type: "error",
           text: json.error ?? "No se pudo registrar la asistencia",

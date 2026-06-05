@@ -1,3 +1,11 @@
+export interface HorarioLaboralDia {
+  activo: boolean;
+  entrada: string;
+  salida: string;
+}
+
+export type HorariosLaborales = Record<string, HorarioLaboralDia>;
+
 export interface Company {
   id: string;
   nombre_empresa: string;
@@ -9,6 +17,7 @@ export interface Company {
   firma_requerida: boolean;
   hora_entrada: string | null;
   hora_salida: string | null;
+  horarios_laborales: HorariosLaborales | null;
   tolerancia_minutos: number;
   estado_suscripcion: "trial" | "active" | "expired" | "cancelled";
   fecha_inicio_trial: string;
@@ -43,13 +52,24 @@ export interface AttendanceRecord {
   empleado_id: string;
   tipo_registro: TipoRegistro;
   fecha_hora: string;
+  created_at?: string;
+  created_by?: string | null;
   latitud: number | null;
   longitud: number | null;
   distancia_empresa_metros: number | null;
   valido: boolean;
+  estado_registro?: "vigente" | "corregido" | "anulado";
   foto_url: string | null;
   firma_url: string | null;
   duracion_colacion_minutos?: number | null;
+  correction_reason?: string | null;
+  corrected_by?: string | null;
+  corrected_at?: string | null;
+  correction_count?: number;
+  request_ip?: string | null;
+  user_agent?: string | null;
+  client_metadata?: Record<string, unknown>;
+  record_hash?: string | null;
   // joined fields
   employees?: {
     nombre: string;
@@ -124,5 +144,6 @@ export interface UpdateCompanyPayload {
   firma_requerida?: boolean;
   hora_entrada?: string;
   hora_salida?: string;
+  horarios_laborales?: HorariosLaborales;
   tolerancia_minutos?: number;
 }

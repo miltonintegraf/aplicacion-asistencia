@@ -1,6 +1,7 @@
 import { getUser, getEmployee, createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { AttendanceCorrectionActions } from "@/components/admin/AttendanceCorrectionActions";
 
 interface SearchParams {
   empleado_id?: string;
@@ -47,10 +48,17 @@ export default async function AttendancePage({
       empleado_id,
       tipo_registro,
       fecha_hora,
+      created_at,
       distancia_empresa_metros,
       valido,
+      estado_registro,
       foto_url,
       firma_url,
+      duracion_colacion_minutos,
+      correction_reason,
+      corrected_at,
+      correction_count,
+      record_hash,
       employees (nombre, email)
     `,
       { count: "exact" }
@@ -255,10 +263,19 @@ export default async function AttendancePage({
                       Estado
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Registro
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Foto
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Firma
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Huella
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Acción
                     </th>
                   </tr>
                 </thead>
@@ -323,6 +340,29 @@ export default async function AttendancePage({
                           </span>
                         </td>
                         <td className="px-6 py-4">
+                          {(() => {
+                            const estado = record.estado_registro ?? "vigente";
+                            const estadoMap: Record<string, { label: string; className: string }> = {
+                              vigente: { label: "Vigente", className: "bg-gray-100 text-gray-700" },
+                              corregido: { label: "Corregido", className: "bg-amber-100 text-amber-700" },
+                              anulado: { label: "Anulado", className: "bg-red-100 text-red-700" },
+                            };
+                            const item = estadoMap[estado] ?? estadoMap.vigente;
+                            return (
+                              <div>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${item.className}`}>
+                                  {item.label}
+                                </span>
+                                {record.correction_count ? (
+                                  <p className="mt-1 text-xs text-gray-400">
+                                    {record.correction_count} cambio{record.correction_count === 1 ? "" : "s"}
+                                  </p>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-6 py-4">
                           {record.foto_url && signedPhotoUrls[record.foto_url] ? (
                             <a
                               href={signedPhotoUrls[record.foto_url]}
@@ -355,6 +395,26 @@ export default async function AttendancePage({
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {record.record_hash ? (
+                            <span className="font-mono text-xs text-gray-500" title={record.record_hash}>
+                              {record.record_hash.slice(0, 10)}...
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <AttendanceCorrectionActions
+                            record={{
+                              id: record.id,
+                              tipo_registro: record.tipo_registro,
+                              fecha_hora: record.fecha_hora,
+                              estado_registro: record.estado_registro,
+                              duracion_colacion_minutos: record.duracion_colacion_minutos,
+                            }}
+                          />
                         </td>
                       </tr>
                     );
