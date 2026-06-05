@@ -37,8 +37,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Verify target employee belongs to same company
     const { data: targetEmployee, error: targetError } = await supabase
       .from("employees")
-      .select("empresa_id")
+      .select("empresa_id, eliminado_at")
       .eq("id", id)
+      .is("eliminado_at", null)
       .single();
 
     if (
@@ -74,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .update(updateData)
       .eq("id", id)
       .eq("empresa_id", currentEmployee.empresa_id)
-      .select("id, nombre, email, activo, role, modalidad, dias_presenciales, fecha_creacion")
+      .select("id, nombre, email, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
       .single();
 
     if (updateError) {
@@ -122,33 +123,59 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Prevent self-deactivation
+    const body = (await request.json().catch(() => ({}))) as {
+      confirm_name?: string;
+    };
+
+    // Prevent self-delete
     if (id === user.id) {
       return NextResponse.json(
-        { error: "No puedes desactivar tu propia cuenta" },
+        { error: "No puedes eliminar tu propia cuenta" },
         { status: 400 }
       );
     }
 
-    // Soft delete: set activo = false
-    const { data: deactivated, error: deactivateError } = await supabase
+    const { data: targetEmployee, error: targetError } = await supabase
       .from("employees")
-      .update({ activo: false })
+      .select("id, empresa_id, nombre, eliminado_at")
       .eq("id", id)
       .eq("empresa_id", currentEmployee.empresa_id)
-      .select("id, nombre, activo")
+      .is("eliminado_at", null)
       .single();
 
-    if (deactivateError) {
+    if (targetError || !targetEmployee) {
       return NextResponse.json(
-        { error: "Error al desactivar empleado: " + deactivateError.message },
+        { error: "Empleado no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    if ((body.confirm_name ?? "").trim() !== targetEmployee.nombre) {
+      return NextResponse.json(
+        { error: "Para confirmar, escribe exactamente el nombre del empleado" },
+        { status: 400 }
+      );
+    }
+
+    // Safe delete: hide from employee management and disable access, keeping attendance history.
+    const { data: deleted, error: deleteError } = await supabase
+      .from("employees")
+      .update({ activo: false, eliminado_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("empresa_id", currentEmployee.empresa_id)
+      .select("id, nombre, activo, eliminado_at")
+      .single();
+
+    if (deleteError) {
+      return NextResponse.json(
+        { error: "Error al eliminar empleado: " + deleteError.message },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
-      data: deactivated,
-      message: "Empleado desactivado correctamente",
+      data: deleted,
+      message: "Empleado eliminado correctamente",
     });
   } catch (err) {
     console.error("DELETE /api/employees/[id] error:", err);

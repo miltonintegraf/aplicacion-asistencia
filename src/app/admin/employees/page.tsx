@@ -9,6 +9,7 @@ async function getEmployees(empresa_id: string): Promise<Employee[]> {
     .from("employees")
     .select("*")
     .eq("empresa_id", empresa_id)
+    .is("eliminado_at", null)
     .order("fecha_creacion", { ascending: false });
   return employees ?? [];
 }

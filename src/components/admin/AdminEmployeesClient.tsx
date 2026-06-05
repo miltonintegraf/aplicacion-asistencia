@@ -28,6 +28,11 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
   const [formError, setFormError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [form, setForm] = useState<EmployeeFormData>({
     nombre: "",
@@ -169,6 +174,54 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
       setError("Error de conexión");
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const openDeleteModal = (emp: Employee) => {
+    setEmployeeToDelete(emp);
+    setDeleteConfirmName("");
+    setDeleteError(null);
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteLoading) return;
+    setDeleteModalOpen(false);
+    setEmployeeToDelete(null);
+    setDeleteConfirmName("");
+    setDeleteError(null);
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+
+    setDeleteError(null);
+    setDeleteLoading(true);
+
+    try {
+      const res = await fetch(`/api/employees/${employeeToDelete.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm_name: deleteConfirmName }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setDeleteError(json.error ?? "Error al eliminar empleado");
+        return;
+      }
+
+      setEmployees((prev) => prev.filter((emp) => emp.id !== employeeToDelete.id));
+      setSuccessMsg("Empleado eliminado correctamente");
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setDeleteModalOpen(false);
+      setEmployeeToDelete(null);
+      setDeleteConfirmName("");
+      setDeleteError(null);
+    } catch {
+      setDeleteError("Error de conexión");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -343,6 +396,12 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
                       >
                         {togglingId === emp.id ? "Procesando..." : emp.activo ? "Desactivar" : "Activar"}
                       </button>
+                      <button
+                        onClick={() => openDeleteModal(emp)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                      >
+                        Eliminar
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -488,6 +547,62 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={deleteModalOpen}
+        onClose={closeDeleteModal}
+        title="Eliminar empleado"
+      >
+        {employeeToDelete && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-sm font-semibold text-red-800">
+                ¿Seguro que quieres eliminar a "{employeeToDelete.nombre}"?
+              </p>
+              <p className="mt-1 text-sm text-red-700">
+                El empleado dejará de aparecer en la lista y no podrá ingresar. Sus marcaciones históricas se conservarán.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1.5">
+                Escribe el nombre exacto para confirmar
+              </label>
+              <input
+                value={deleteConfirmName}
+                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm text-gray-900"
+                placeholder={employeeToDelete.nombre}
+                autoComplete="off"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">
+                Debes escribir: <span className="font-semibold">{employeeToDelete.nombre}</span>
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button type="button" variant="secondary" onClick={closeDeleteModal}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                loading={deleteLoading}
+                disabled={deleteConfirmName.trim() !== employeeToDelete.nombre}
+                onClick={handleDeleteEmployee}
+              >
+                Eliminar empleado
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

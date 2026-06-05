@@ -36,6 +36,7 @@ export interface Employee {
   modalidad: "presencial" | "remoto" | "hibrido";
   dias_presenciales: number[];
   fecha_creacion: string;
+  eliminado_at?: string | null;
 }
 
 export type TipoRegistro =
