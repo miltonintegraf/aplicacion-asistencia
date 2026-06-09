@@ -82,6 +82,12 @@ export async function PATCH(request: NextRequest) {
     const updateData: Partial<UpdateCompanyPayload> = {};
     if (body.nombre_empresa !== undefined)
       updateData.nombre_empresa = body.nombre_empresa;
+    if (body.rut_empresa !== undefined)
+      updateData.rut_empresa = body.rut_empresa;
+    if (body.razon_social !== undefined)
+      updateData.razon_social = body.razon_social;
+    if (body.representante_legal !== undefined)
+      updateData.representante_legal = body.representante_legal;
     if (body.direccion !== undefined) updateData.direccion = body.direccion;
     if (body.latitud !== undefined) updateData.latitud = body.latitud;
     if (body.longitud !== undefined) updateData.longitud = body.longitud;

@@ -11,6 +11,8 @@ interface EmployeeFormData {
   email: string;
   password: string;
   role: "admin" | "employee" | "super_admin";
+  rut: string;
+  cargo: string;
   modalidad: "presencial" | "remoto" | "hibrido";
   dias_presenciales: number[];
 }
@@ -39,6 +41,8 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
     email: "",
     password: "",
     role: "employee",
+    rut: "",
+    cargo: "",
     modalidad: "presencial",
     dias_presenciales: [],
   });
@@ -59,6 +63,8 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
       email: "",
       password: "",
       role: "employee",
+      rut: "",
+      cargo: "",
       modalidad: "presencial",
       dias_presenciales: [],
     });
@@ -73,6 +79,8 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
       email: emp.email,
       password: "",
       role: emp.role,
+      rut: emp.rut || "",
+      cargo: emp.cargo || "",
       modalidad: emp.modalidad,
       dias_presenciales: emp.dias_presenciales || [],
     });
@@ -96,6 +104,8 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
             nombre: form.nombre,
             email: form.email,
             role: form.role,
+            rut: form.rut || null,
+            cargo: form.cargo || null,
             modalidad: form.modalidad,
             dias_presenciales: form.dias_presenciales,
           }),
@@ -138,6 +148,8 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
           email: "",
           password: "",
           role: "employee",
+          rut: "",
+          cargo: "",
           modalidad: "presencial",
           dias_presenciales: [],
         });
@@ -303,6 +315,9 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
                     Email
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    RUT / Cargo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Rol
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -335,6 +350,10 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{emp.email}</td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-700">{emp.rut || "Sin RUT"}</p>
+                      <p className="text-xs text-gray-400">{emp.cargo || "Sin cargo"}</p>
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
@@ -469,6 +488,21 @@ export default function AdminEmployeesClient({ initialEmployees }: AdminEmployee
             onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
             placeholder="juan@empresa.com"
           />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="RUT"
+              value={form.rut}
+              onChange={(e) => setForm((p) => ({ ...p, rut: e.target.value }))}
+              placeholder="12.345.678-9"
+            />
+            <Input
+              label="Cargo"
+              value={form.cargo}
+              onChange={(e) => setForm((p) => ({ ...p, cargo: e.target.value }))}
+              placeholder="Operario, supervisor..."
+            />
+          </div>
 
           {!editingId && (
             <Input

@@ -38,7 +38,7 @@ export async function GET() {
 
     const { data: employees, error } = await supabase
       .from("employees")
-      .select("id, nombre, email, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
+      .select("id, nombre, email, rut, cargo, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
       .eq("empresa_id", currentEmployee.empresa_id)
       .is("eliminado_at", null)
       .order("fecha_creacion", { ascending: true });
@@ -137,12 +137,14 @@ export async function POST(request: NextRequest) {
         empresa_id: currentEmployee.empresa_id,
         nombre: body.nombre,
         email: body.email,
+        rut: body.rut ?? null,
+        cargo: body.cargo ?? null,
         role: body.role ?? "employee",
         activo: true,
         modalidad: body.modalidad ?? "presencial",
         dias_presenciales: body.dias_presenciales ?? [],
       })
-      .select("id, nombre, email, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
+      .select("id, nombre, email, rut, cargo, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
       .single();
 
     if (insertError) {

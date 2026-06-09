@@ -27,6 +27,8 @@ interface EmployeeRow {
   id: string;
   nombre: string;
   email: string;
+  rut?: string | null;
+  cargo?: string | null;
 }
 
 interface AttendanceRow {
@@ -42,6 +44,10 @@ interface AttendanceRow {
 
 interface CompanyRow {
   nombre_empresa: string;
+  rut_empresa?: string | null;
+  razon_social?: string | null;
+  representante_legal?: string | null;
+  direccion?: string | null;
   hora_entrada: string | null;
   hora_salida: string | null;
   horarios_laborales: HorariosLaborales | null;
@@ -190,7 +196,7 @@ export async function GET(request: NextRequest) {
 
     const { data: currentEmployee, error: empError } = await supabase
       .from("employees")
-      .select("empresa_id, role")
+      .select("empresa_id, role, nombre, email")
       .eq("id", user.id)
       .single();
 
@@ -215,12 +221,12 @@ export async function GET(request: NextRequest) {
     const [{ data: company }, { data: employees }, { data: records }] = await Promise.all([
       supabase
         .from("companies")
-        .select("nombre_empresa, hora_entrada, hora_salida, horarios_laborales")
+        .select("nombre_empresa, rut_empresa, razon_social, representante_legal, direccion, hora_entrada, hora_salida, horarios_laborales")
         .eq("id", currentEmployee.empresa_id)
         .single(),
       supabase
         .from("employees")
-        .select("id, nombre, email")
+        .select("id, nombre, email, rut, cargo")
         .eq("empresa_id", currentEmployee.empresa_id)
         .is("eliminado_at", null)
         .neq("role", "admin")
@@ -264,7 +270,13 @@ export async function GET(request: NextRequest) {
 
         return {
           Empresa: companyRow?.nombre_empresa ?? "",
+          "RUT empresa": companyRow?.rut_empresa ?? "",
+          "Razon social": companyRow?.razon_social ?? companyRow?.nombre_empresa ?? "",
+          "Representante legal": companyRow?.representante_legal ?? "",
+          Direccion: companyRow?.direccion ?? "",
           Trabajador: employee.nombre,
+          "RUT trabajador": employee.rut ?? "",
+          Cargo: employee.cargo ?? "",
           Email: employee.email,
           Fecha: dateKey,
           "Dia programado": schedule.activo ? "Si" : "No",
@@ -294,6 +306,8 @@ export async function GET(request: NextRequest) {
 
       return {
         Trabajador: employee.nombre,
+        "RUT trabajador": employee.rut ?? "",
+        Cargo: employee.cargo ?? "",
         Email: employee.email,
         "Periodo desde": fechaInicio,
         "Periodo hasta": fechaFin,
@@ -307,12 +321,37 @@ export async function GET(request: NextRequest) {
     });
 
     const wb = XLSX.utils.book_new();
+    const metadataRows = [
+      { Campo: "Empresa", Valor: companyRow?.nombre_empresa ?? "" },
+      { Campo: "RUT empresa", Valor: companyRow?.rut_empresa ?? "" },
+      { Campo: "Razon social", Valor: companyRow?.razon_social ?? companyRow?.nombre_empresa ?? "" },
+      { Campo: "Representante legal", Valor: companyRow?.representante_legal ?? "" },
+      { Campo: "Direccion", Valor: companyRow?.direccion ?? "" },
+      { Campo: "Periodo desde", Valor: fechaInicio },
+      { Campo: "Periodo hasta", Valor: fechaFin },
+      {
+        Campo: "Fecha emision",
+        Valor: new Date().toLocaleString("es-CL", { timeZone: "America/Santiago" }),
+      },
+      {
+        Campo: "Generado por",
+        Valor: `${currentEmployee.nombre ?? ""} (${currentEmployee.email ?? ""})`,
+      },
+    ];
+    const metadataSheet = XLSX.utils.json_to_sheet(metadataRows);
     const detailSheet = XLSX.utils.json_to_sheet(detailRows);
     const summarySheet = XLSX.utils.json_to_sheet(summaryByEmployee);
 
+    metadataSheet["!cols"] = [{ wch: 24 }, { wch: 45 }];
     detailSheet["!cols"] = [
       { wch: 24 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 26 },
+      { wch: 30 },
       { wch: 24 },
+      { wch: 16 },
+      { wch: 20 },
       { wch: 30 },
       { wch: 12 },
       { wch: 14 },
@@ -331,6 +370,8 @@ export async function GET(request: NextRequest) {
 
     summarySheet["!cols"] = [
       { wch: 24 },
+      { wch: 16 },
+      { wch: 20 },
       { wch: 30 },
       { wch: 14 },
       { wch: 14 },
@@ -342,6 +383,7 @@ export async function GET(request: NextRequest) {
       { wch: 12 },
     ];
 
+    XLSX.utils.book_append_sheet(wb, metadataSheet, "Datos legales");
     XLSX.utils.book_append_sheet(wb, summarySheet, "Resumen");
     XLSX.utils.book_append_sheet(wb, detailSheet, "Detalle diario");
 

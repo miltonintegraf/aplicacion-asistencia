@@ -49,7 +49,6 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
   const [weekStart, setWeekStart] = useState(formatDate(getMonday(now)));
   const [summary, setSummary] = useState<EmployeeSummary[]>([]);
   const [loadingData, setLoadingData] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [exportingSummary, setExportingSummary] = useState(false);
   const [exportingLegal, setExportingLegal] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,35 +87,6 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
   useEffect(() => {
     fetchSummary();
   }, [fechaInicio, fechaFin]);
-
-  const handleExportExcel = async () => {
-    setExporting(true);
-    try {
-      const params = new URLSearchParams({
-        fecha_inicio: fechaInicio,
-        fecha_fin: fechaFin,
-      });
-      const res = await fetch(`/api/attendance/export?${params}`);
-      if (!res.ok) {
-        const json = await res.json();
-        setError(json.error ?? "Error al exportar");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `asistencias_${year}_${String(month).padStart(2, "0")}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      setError("Error al exportar el archivo");
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const handleExportSummary = async () => {
     setExportingSummary(true);
@@ -305,26 +275,6 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
                 />
               </svg>
               Fiscalización
-            </Button>
-            <Button
-              onClick={handleExportExcel}
-              loading={exporting}
-              disabled={summary.length === 0}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Detalle
             </Button>
             <Button
               onClick={handleExportSummary}

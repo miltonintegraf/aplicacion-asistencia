@@ -9,6 +9,9 @@ export type HorariosLaborales = Record<string, HorarioLaboralDia>;
 export interface Company {
   id: string;
   nombre_empresa: string;
+  rut_empresa?: string | null;
+  razon_social?: string | null;
+  representante_legal?: string | null;
   direccion: string | null;
   latitud: number | null;
   longitud: number | null;
@@ -30,6 +33,8 @@ export interface Employee {
   empresa_id: string;
   nombre: string;
   email: string;
+  rut?: string | null;
+  cargo?: string | null;
   password_hash?: string | null;
   activo: boolean;
   role: "admin" | "employee" | "super_admin";
@@ -113,6 +118,8 @@ export interface CreateEmployeePayload {
   email: string;
   password: string;
   role?: "admin" | "employee" | "super_admin";
+  rut?: string | null;
+  cargo?: string | null;
   modalidad?: "presencial" | "remoto" | "hibrido";
   dias_presenciales?: number[];
 }
@@ -121,6 +128,8 @@ export interface UpdateEmployeePayload {
   nombre?: string;
   email?: string;
   activo?: boolean;
+  rut?: string | null;
+  cargo?: string | null;
   modalidad?: "presencial" | "remoto" | "hibrido";
   dias_presenciales?: number[];
 }
@@ -137,6 +146,9 @@ export interface CreateAttendancePayload {
 
 export interface UpdateCompanyPayload {
   nombre_empresa?: string;
+  rut_empresa?: string | null;
+  razon_social?: string | null;
+  representante_legal?: string | null;
   direccion?: string;
   latitud?: number;
   longitud?: number;

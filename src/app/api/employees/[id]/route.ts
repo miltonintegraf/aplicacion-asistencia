@@ -60,6 +60,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.nombre !== undefined) updateData.nombre = body.nombre;
     if (body.email !== undefined) updateData.email = body.email;
     if (body.activo !== undefined) updateData.activo = body.activo;
+    if (body.rut !== undefined) updateData.rut = body.rut;
+    if (body.cargo !== undefined) updateData.cargo = body.cargo;
     if (body.modalidad !== undefined) updateData.modalidad = body.modalidad;
     if (body.dias_presenciales !== undefined) updateData.dias_presenciales = body.dias_presenciales;
 
@@ -75,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .update(updateData)
       .eq("id", id)
       .eq("empresa_id", currentEmployee.empresa_id)
-      .select("id, nombre, email, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
+      .select("id, nombre, email, rut, cargo, activo, role, modalidad, dias_presenciales, fecha_creacion, eliminado_at")
       .single();
 
     if (updateError) {

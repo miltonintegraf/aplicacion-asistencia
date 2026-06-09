@@ -39,6 +39,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
   const [company, setCompany] = useState<Company | null>(initialCompany);
   const [form, setForm] = useState({
     nombre_empresa: "",
+    rut_empresa: "",
+    razon_social: "",
+    representante_legal: "",
     direccion: "",
     latitud: "",
     longitud: "",
@@ -59,6 +62,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
     if (initialCompany) {
       setForm({
         nombre_empresa: initialCompany.nombre_empresa || "",
+        rut_empresa: initialCompany.rut_empresa || "",
+        razon_social: initialCompany.razon_social || "",
+        representante_legal: initialCompany.representante_legal || "",
         direccion: initialCompany.direccion || "",
         latitud: String(initialCompany.latitud || ""),
         longitud: String(initialCompany.longitud || ""),
@@ -95,6 +101,9 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre_empresa: form.nombre_empresa,
+          rut_empresa: form.rut_empresa || null,
+          razon_social: form.razon_social || null,
+          representante_legal: form.representante_legal || null,
           direccion: form.direccion,
           latitud: form.latitud ? parseFloat(form.latitud) : null,
           longitud: form.longitud ? parseFloat(form.longitud) : null,
@@ -172,6 +181,11 @@ export default function AdminSettingsClient({ initialCompany }: AdminSettingsCli
         <div className="bg-white rounded-xl border border-gray-200 shadow-md shadow-gray-200/70 p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">Datos de la empresa</h2>
           <Input label="Nombre de la empresa *" required value={form.nombre_empresa} onChange={(e) => setForm((p) => ({ ...p, nombre_empresa: e.target.value }))} placeholder="Empresa S.A." />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="RUT empresa" value={form.rut_empresa} onChange={(e) => setForm((p) => ({ ...p, rut_empresa: e.target.value }))} placeholder="76.123.456-7" />
+            <Input label="Razon social" value={form.razon_social} onChange={(e) => setForm((p) => ({ ...p, razon_social: e.target.value }))} placeholder="Empresa SpA" />
+          </div>
+          <Input label="Representante legal" value={form.representante_legal} onChange={(e) => setForm((p) => ({ ...p, representante_legal: e.target.value }))} placeholder="Nombre representante legal" />
           <Input label="Direccion" value={form.direccion} onChange={(e) => setForm((p) => ({ ...p, direccion: e.target.value }))} placeholder="Av. Principal 123, Ciudad" />
         </div>
 
