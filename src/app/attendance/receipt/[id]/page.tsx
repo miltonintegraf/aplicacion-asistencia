@@ -73,19 +73,7 @@ export default async function AttendanceReceiptPage({ params }: ReceiptPageProps
       correction_reason,
       corrected_at,
       correction_count,
-      record_hash,
-      companies (
-        nombre_empresa,
-        rut_empresa,
-        razon_social,
-        direccion
-      ),
-      employees (
-        nombre,
-        email,
-        rut,
-        cargo
-      )
+      record_hash
     `
     )
     .eq("id", id)
@@ -100,14 +88,27 @@ export default async function AttendanceReceiptPage({ params }: ReceiptPageProps
 
   if (!canView) return <NotFoundReceipt />;
 
-  const company = record.companies as {
+  const [{ data: company }, { data: recordEmployee }] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("nombre_empresa, rut_empresa, razon_social, direccion")
+      .eq("id", record.empresa_id)
+      .single(),
+    supabase
+      .from("employees")
+      .select("nombre, email, rut, cargo")
+      .eq("id", record.empleado_id)
+      .single(),
+  ]);
+
+  const companyRow = company as {
     nombre_empresa?: string | null;
     rut_empresa?: string | null;
     razon_social?: string | null;
     direccion?: string | null;
   } | null;
 
-  const employee = record.employees as {
+  const employeeRow = recordEmployee as {
     nombre?: string | null;
     email?: string | null;
     rut?: string | null;
@@ -147,16 +148,16 @@ export default async function AttendanceReceiptPage({ params }: ReceiptPageProps
             <div>
               <p className="text-xs font-semibold uppercase text-gray-400">Empresa</p>
               <p className="mt-1 font-semibold text-gray-900">
-                {company?.razon_social || company?.nombre_empresa || "-"}
+                {companyRow?.razon_social || companyRow?.nombre_empresa || "-"}
               </p>
-              <p className="text-sm text-gray-500">RUT: {company?.rut_empresa || "-"}</p>
-              <p className="text-sm text-gray-500">{company?.direccion || ""}</p>
+              <p className="text-sm text-gray-500">RUT: {companyRow?.rut_empresa || "-"}</p>
+              <p className="text-sm text-gray-500">{companyRow?.direccion || ""}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase text-gray-400">Trabajador</p>
-              <p className="mt-1 font-semibold text-gray-900">{employee?.nombre || "-"}</p>
-              <p className="text-sm text-gray-500">RUT: {employee?.rut || "-"}</p>
-              <p className="text-sm text-gray-500">{employee?.cargo || employee?.email || ""}</p>
+              <p className="mt-1 font-semibold text-gray-900">{employeeRow?.nombre || "-"}</p>
+              <p className="text-sm text-gray-500">RUT: {employeeRow?.rut || "-"}</p>
+              <p className="text-sm text-gray-500">{employeeRow?.cargo || employeeRow?.email || ""}</p>
             </div>
           </div>
 
