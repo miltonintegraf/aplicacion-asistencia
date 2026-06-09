@@ -45,6 +45,10 @@ export default async function AdminFiscalizationPage({
     fecha_inicio: fechaInicio,
     fecha_fin: fechaFin,
   });
+  const auditExportParams = new URLSearchParams({
+    fecha_inicio: fechaInicio,
+    fecha_fin: fechaFin,
+  });
 
   const supabase = await createClient();
   const [
@@ -178,6 +182,12 @@ export default async function AdminFiscalizationPage({
               className="flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
               Descargar fiscalización
+            </Link>
+            <Link
+              href={`/api/attendance/audit-export?${auditExportParams.toString()}`}
+              className="flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Descargar trazabilidad
             </Link>
           </form>
         </section>
