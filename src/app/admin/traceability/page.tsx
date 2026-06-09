@@ -390,7 +390,6 @@ export default async function AdminTraceabilityPage({
                         {log.attendance_id ? (
                           <Link
                             href={`/attendance/receipt/${log.attendance_id}`}
-                            target="_blank"
                             className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
                           >
                             Abrir

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient, getEmployee, getUser } from "@/lib/supabase/server";
+import { createServiceClient, getEmployee, getUser } from "@/lib/supabase/server";
 import { attendanceStatusLabel, attendanceTypeLabel } from "@/lib/attendance/labels";
 import { PrintReceiptButton } from "@/components/attendance/PrintReceiptButton";
 
@@ -26,6 +26,25 @@ function formatNumber(value: number | null | undefined) {
   return String(Math.round(value));
 }
 
+function NotFoundReceipt() {
+  return (
+    <main className="min-h-screen bg-gray-100 px-4 py-8">
+      <div className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900">Comprobante no disponible</h1>
+        <p className="mt-2 text-sm text-gray-500">
+          No encontramos este registro o no tienes permisos para verlo.
+        </p>
+        <Link
+          href="/admin/traceability"
+          className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Volver a trazabilidad
+        </Link>
+      </div>
+    </main>
+  );
+}
+
 export default async function AttendanceReceiptPage({ params }: ReceiptPageProps) {
   const { id } = await params;
   const { user } = await getUser();
@@ -34,8 +53,8 @@ export default async function AttendanceReceiptPage({ params }: ReceiptPageProps
   const { employee: currentEmployee } = await getEmployee(user.id);
   if (!currentEmployee) redirect("/login");
 
-  const supabase = await createClient();
-  const { data: record } = await supabase
+  const supabase = await createServiceClient();
+  const { data: record, error } = await supabase
     .from("attendance")
     .select(
       `
@@ -72,14 +91,14 @@ export default async function AttendanceReceiptPage({ params }: ReceiptPageProps
     .eq("id", id)
     .single();
 
-  if (!record) redirect("/login");
+  if (error || !record) return <NotFoundReceipt />;
 
   const canView =
     currentEmployee.role === "admin"
       ? currentEmployee.empresa_id === record.empresa_id
       : user.id === record.empleado_id;
 
-  if (!canView) redirect("/login");
+  if (!canView) return <NotFoundReceipt />;
 
   const company = record.companies as {
     nombre_empresa?: string | null;

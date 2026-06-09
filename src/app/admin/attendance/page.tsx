@@ -411,7 +411,6 @@ export default async function AttendancePage({
                         <td className="px-6 py-4">
                           <Link
                             href={`/attendance/receipt/${record.id}`}
-                            target="_blank"
                             className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
                           >
                             Ver

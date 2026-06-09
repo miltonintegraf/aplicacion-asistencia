@@ -68,6 +68,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
 
+    // Shared receipt route: both admin and employee can open attendance receipts.
+    if (pathname.startsWith("/attendance/receipt")) {
+      return supabaseResponse;
+    }
+
     // Employee trying to access admin routes
     if (pathname.startsWith("/admin") && role === "employee") {
       return NextResponse.redirect(
