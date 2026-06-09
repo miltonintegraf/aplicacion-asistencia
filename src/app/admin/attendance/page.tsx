@@ -275,6 +275,9 @@ export default async function AttendancePage({
                       Huella
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Comprobante
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Acción
                     </th>
                   </tr>
@@ -404,6 +407,15 @@ export default async function AttendancePage({
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <Link
+                            href={`/attendance/receipt/${record.id}`}
+                            target="_blank"
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                          >
+                            Ver
+                          </Link>
                         </td>
                         <td className="px-6 py-4">
                           <AttendanceCorrectionActions

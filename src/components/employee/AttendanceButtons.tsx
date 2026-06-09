@@ -185,6 +185,7 @@ export function AttendanceButtons({
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
+    receiptId?: string;
   } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<
     "idle" | "requesting" | "granted" | "denied"
@@ -489,6 +490,7 @@ export function AttendanceButtons({
         setMessage({
           type: "success",
           text: `${json.message}${json.distancia ? ` (${json.distancia}m de la empresa)` : ""}`,
+          receiptId: savedRecord.id,
         });
       } else {
         const expectedStep = getExpectedStepFromError(json);
@@ -673,7 +675,17 @@ export function AttendanceButtons({
         </div>
         {message && (
           <div className="w-full rounded-xl px-4 py-3 bg-green-50 border border-green-200 text-sm text-green-700 font-medium">
-            {message.text}
+            <p>{message.text}</p>
+            {message.receiptId ? (
+              <a
+                href={`/attendance/receipt/${message.receiptId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex text-green-800 underline underline-offset-2"
+              >
+                Ver comprobante
+              </a>
+            ) : null}
           </div>
         )}
         <button
@@ -803,13 +815,25 @@ export function AttendanceButtons({
                 </svg>
               )}
             </div>
-            <p
-              className={`text-sm font-medium ${
-                message.type === "success" ? "text-green-700" : "text-red-700"
-              }`}
-            >
-              {message.text}
-            </p>
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  message.type === "success" ? "text-green-700" : "text-red-700"
+                }`}
+              >
+                {message.text}
+              </p>
+              {message.receiptId ? (
+                <a
+                  href={`/attendance/receipt/${message.receiptId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex text-sm font-semibold text-green-800 underline underline-offset-2"
+                >
+                  Ver comprobante
+                </a>
+              ) : null}
+            </div>
           </div>
         )}
 
