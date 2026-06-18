@@ -9,6 +9,7 @@ interface EmployeeSummary {
   email: string;
   dias_programados: number;
   dias_trabajados: number;
+  dias_justificados: number;
   total_entradas: number;
   total_salidas: number;
   horas_trabajadas: number;
@@ -381,6 +382,9 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
                     Días trab.
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
+                    Justificados
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
                     Horas estimadas
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
@@ -418,6 +422,11 @@ export default function AdminReportsClient({ initialEmpleados }: AdminReportsCli
                       <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
                           {emp.dias_trabajados}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center justify-center px-2 py-1 rounded bg-amber-50 text-amber-700 font-semibold text-sm">
+                          {emp.dias_justificados ?? 0}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center font-mono text-sm text-gray-700">

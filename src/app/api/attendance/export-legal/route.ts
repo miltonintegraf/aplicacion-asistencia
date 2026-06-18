@@ -53,6 +53,19 @@ interface CompanyRow {
   horarios_laborales: HorariosLaborales | null;
 }
 
+interface HolidayRow {
+  fecha: string;
+  nombre: string;
+}
+
+interface AbsenceRow {
+  empleado_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo: string;
+  motivo: string;
+}
+
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -168,6 +181,15 @@ function dayStatus(records: AttendanceRow[], scheduleActive: boolean) {
   return hasCorrections ? "Completo corregido" : "Completo";
 }
 
+function findAbsence(absences: AbsenceRow[], employeeId: string, dateKey: string) {
+  return absences.find(
+    (absence) =>
+      absence.empleado_id === employeeId &&
+      absence.fecha_inicio <= dateKey &&
+      absence.fecha_fin >= dateKey
+  );
+}
+
 function correctionNotes(records: AttendanceRow[]) {
   const notes = records
     .filter((record) => record.estado_registro === "anulado" || (record.correction_count ?? 0) > 0 || record.correction_reason)
@@ -218,7 +240,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [{ data: company }, { data: employees }, { data: records }] = await Promise.all([
+    const [{ data: company }, { data: employees }, { data: records }, { data: holidays }, { data: absences }] = await Promise.all([
       supabase
         .from("companies")
         .select("nombre_empresa, rut_empresa, razon_social, representante_legal, direccion, hora_entrada, hora_salida, horarios_laborales")
@@ -238,11 +260,27 @@ export async function GET(request: NextRequest) {
         .gte("fecha_hora", fechaInicio)
         .lte("fecha_hora", `${fechaFin}T23:59:59.999Z`)
         .order("fecha_hora", { ascending: true }),
+      supabase
+        .from("company_holidays")
+        .select("fecha, nombre")
+        .eq("empresa_id", currentEmployee.empresa_id)
+        .gte("fecha", fechaInicio)
+        .lte("fecha", fechaFin),
+      supabase
+        .from("employee_absences")
+        .select("empleado_id, fecha_inicio, fecha_fin, tipo, motivo")
+        .eq("empresa_id", currentEmployee.empresa_id)
+        .is("deleted_at", null)
+        .lte("fecha_inicio", fechaFin)
+        .gte("fecha_fin", fechaInicio),
     ]);
 
     const employeeRows = (employees ?? []) as EmployeeRow[];
     const attendanceRows = (records ?? []) as AttendanceRow[];
     const companyRow = company as CompanyRow | null;
+    const holidayRows = (holidays ?? []) as HolidayRow[];
+    const absenceRows = (absences ?? []) as AbsenceRow[];
+    const holidaysByDate = new Map(holidayRows.map((holiday) => [holiday.fecha, holiday]));
     const dates = buildDateList(fechaInicio, fechaFin);
 
     const recordsByEmployeeDate = new Map<string, AttendanceRow[]>();
@@ -264,9 +302,21 @@ export async function GET(request: NextRequest) {
         const salidaAlmuerzo = getFirst(activeRecords, "salida_almuerzo");
         const entradaAlmuerzo = getFirst(activeRecords, "entrada_almuerzo");
         const salida = getLast(activeRecords, "salida_laboral");
-        const expected = expectedHours(schedule);
+        const holiday = holidaysByDate.get(dateKey);
+        const absence = findAbsence(absenceRows, employee.id, dateKey);
+        const expected = holiday || absence ? 0 : expectedHours(schedule);
         const worked = workedHours(dayRecords);
         const diff = roundHours(worked - expected);
+        const status = holiday
+          ? "Feriado"
+          : absence
+          ? "Ausencia justificada"
+          : dayStatus(dayRecords, schedule.activo);
+        const notes = [
+          holiday ? `Feriado: ${holiday.nombre}` : "",
+          absence ? `Ausencia: ${absence.tipo} - ${absence.motivo}` : "",
+          correctionNotes(dayRecords),
+        ].filter(Boolean).join(" | ");
 
         return {
           Empresa: companyRow?.nombre_empresa ?? "",
@@ -279,8 +329,8 @@ export async function GET(request: NextRequest) {
           Cargo: employee.cargo ?? "",
           Email: employee.email,
           Fecha: dateKey,
-          "Dia programado": schedule.activo ? "Si" : "No",
-          "Horario esperado": schedule.activo ? `${schedule.entrada} - ${schedule.salida}` : "-",
+          "Dia programado": schedule.activo && !holiday && !absence ? "Si" : "No",
+          "Horario esperado": schedule.activo && !holiday && !absence ? `${schedule.entrada} - ${schedule.salida}` : "-",
           "Entrada laboral": formatTime(entrada?.fecha_hora),
           "Salida almuerzo": formatTime(salidaAlmuerzo?.fecha_hora),
           "Regreso almuerzo": formatTime(entradaAlmuerzo?.fecha_hora),
@@ -289,8 +339,8 @@ export async function GET(request: NextRequest) {
           "Horas trabajadas": worked.toFixed(2),
           "Horas extra": Math.max(0, diff).toFixed(2),
           "Horas debe": Math.max(0, -diff).toFixed(2),
-          "Estado del dia": dayStatus(dayRecords, schedule.activo),
-          Observaciones: correctionNotes(dayRecords),
+          "Estado del dia": status,
+          Observaciones: notes,
         };
       })
     );

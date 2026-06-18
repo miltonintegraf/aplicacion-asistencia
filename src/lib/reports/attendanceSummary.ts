@@ -19,6 +19,13 @@ export interface AttendanceSummaryCompany {
   horarios_laborales: HorariosLaborales | null;
 }
 
+export interface AttendanceSummaryAbsence {
+  empleado_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo: string;
+}
+
 export interface EmployeeHoursSummary {
   id: string;
   nombre: string;
@@ -32,6 +39,7 @@ export interface EmployeeHoursSummary {
   horas_extra: number;
   horas_debe: number;
   diferencia_horas: number;
+  dias_justificados: number;
   estado: "extra" | "debe" | "completo";
 }
 
@@ -95,12 +103,15 @@ function buildExpectedHoursByEmployee(
   employees: AttendanceSummaryEmployee[],
   company: AttendanceSummaryCompany | null,
   fechaInicio: string,
-  fechaFin: string
+  fechaFin: string,
+  holidays: string[],
+  absences: AttendanceSummaryAbsence[]
 ) {
-  const expected: Record<string, { diasProgramados: number; horasEstimadas: number }> = {};
+  const expected: Record<string, { diasProgramados: number; horasEstimadas: number; diasJustificados: number }> = {};
+  const holidaySet = new Set(holidays);
 
   for (const employee of employees) {
-    expected[employee.id] = { diasProgramados: 0, horasEstimadas: 0 };
+    expected[employee.id] = { diasProgramados: 0, horasEstimadas: 0, diasJustificados: 0 };
   }
 
   let cursor = new Date(`${fechaInicio}T00:00:00.000Z`);
@@ -108,9 +119,20 @@ function buildExpectedHoursByEmployee(
 
   while (cursor <= end) {
     const schedule = getScheduleForDate(company, cursor);
-    if (schedule.activo) {
+    const dateKey = getDateKey(cursor);
+    if (schedule.activo && !holidaySet.has(dateKey)) {
       const dayHours = expectedHoursForSchedule(schedule);
       for (const employee of employees) {
+        const justified = absences.some(
+          (absence) =>
+            absence.empleado_id === employee.id &&
+            absence.fecha_inicio <= dateKey &&
+            absence.fecha_fin >= dateKey
+        );
+        if (justified) {
+          expected[employee.id].diasJustificados += 1;
+          continue;
+        }
         expected[employee.id].diasProgramados += 1;
         expected[employee.id].horasEstimadas += dayHours;
       }
@@ -163,14 +185,25 @@ export function buildAttendanceSummary({
   company,
   fechaInicio,
   fechaFin,
+  holidays = [],
+  absences = [],
 }: {
   employees: AttendanceSummaryEmployee[];
   records: AttendanceSummaryRecord[];
   company: AttendanceSummaryCompany | null;
   fechaInicio: string;
   fechaFin: string;
+  holidays?: string[];
+  absences?: AttendanceSummaryAbsence[];
 }): EmployeeHoursSummary[] {
-  const expected = buildExpectedHoursByEmployee(employees, company, fechaInicio, fechaFin);
+  const expected = buildExpectedHoursByEmployee(
+    employees,
+    company,
+    fechaInicio,
+    fechaFin,
+    holidays,
+    absences
+  );
   const recordsByEmployeeDay: Record<string, Record<string, AttendanceSummaryRecord[]>> = {};
   const counts: Record<string, { entradas: number; salidas: number }> = {};
 
@@ -225,6 +258,7 @@ export function buildAttendanceSummary({
       horas_extra: roundHours(horasExtra),
       horas_debe: roundHours(horasDebe),
       diferencia_horas: diferencia,
+      dias_justificados: expected[employee.id]?.diasJustificados ?? 0,
       estado: diferencia > 0 ? "extra" : diferencia < 0 ? "debe" : "completo",
     };
   });

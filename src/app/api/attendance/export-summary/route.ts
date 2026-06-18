@@ -65,12 +65,30 @@ export async function GET(request: NextRequest) {
       .eq("activo", true)
       .neq("role", "admin");
 
+    const [{ data: holidays }, { data: absences }] = await Promise.all([
+      supabase
+        .from("company_holidays")
+        .select("fecha")
+        .eq("empresa_id", currentEmployee.empresa_id)
+        .gte("fecha", fecha_inicio)
+        .lte("fecha", fecha_fin),
+      supabase
+        .from("employee_absences")
+        .select("empleado_id, fecha_inicio, fecha_fin, tipo")
+        .eq("empresa_id", currentEmployee.empresa_id)
+        .is("deleted_at", null)
+        .lte("fecha_inicio", fecha_fin)
+        .gte("fecha_fin", fecha_inicio),
+    ]);
+
     const summary = buildAttendanceSummary({
       employees: employees || [],
       records: records || [],
       company,
       fechaInicio: fecha_inicio,
       fechaFin: fecha_fin,
+      holidays: (holidays || []).map((holiday) => holiday.fecha),
+      absences: absences || [],
     });
 
     // Build export data
@@ -79,6 +97,7 @@ export async function GET(request: NextRequest) {
       Email: emp.email,
       "Dias Programados": emp.dias_programados,
       "Dias Trabajados": emp.dias_trabajados,
+      "Dias Justificados": emp.dias_justificados,
       "Horas Esperadas": emp.horas_estimadas.toFixed(2),
       "Horas Trabajadas": emp.horas_trabajadas.toFixed(2),
       "Horas Extra": emp.horas_extra.toFixed(2),

@@ -40,6 +40,15 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    href: "/admin/absences",
+    label: "Ausencias",
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2zm2-5l2 2 4-5" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/reports",
     label: "Reportes",
     icon: (
